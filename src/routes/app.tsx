@@ -1,34 +1,17 @@
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { useAuth } from "@/lib/auth";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { BottomNav } from "@/components/BottomNav";
-import { Mascot } from "@/components/Mascot";
 
 export const Route = createFileRoute("/app")({
   component: AppLayout,
 });
 
 function AppLayout() {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!loading && !user) navigate({ to: "/login", replace: true });
-  }, [user, loading, navigate]);
-
-  if (loading || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-soft">
-        <Mascot size={96} className="animate-bounce-soft" />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-soft pb-28">
-      <div className="mx-auto max-w-md px-4">
+    <div className="min-h-screen bg-farm pb-28 text-[#4a3828]">
+      <div className="pointer-events-none fixed inset-x-0 top-0 h-48 bg-sky-pixels" />
+      <main className="relative mx-auto min-h-screen max-w-md px-4 pt-4">
         <Outlet />
-      </div>
+      </main>
       <BottomNav />
     </div>
   );

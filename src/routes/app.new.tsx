@@ -1,188 +1,126 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { CheckCircle2, Leaf, NotebookPen } from "lucide-react";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
-import { ArrowLeft } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/auth";
-import { useQueryClient } from "@tanstack/react-query";
-import { PERIODS, INSULIN_TYPES, classify, statusLabel } from "@/lib/glucose";
-import { Mascot } from "@/components/Mascot";
+import { CozyCard, GlucoseStatusBadge, InsulinStepper, PeriodSelector } from "@/components/cozy";
+import { insulinTypes, type PeriodId } from "@/lib/prototype-data";
 
 export const Route = createFileRoute("/app/new")({
   component: NewMeasurement,
 });
 
-function suggestPeriod() {
-  const h = new Date().getHours();
-  if (h < 6) return "madrugada";
-  if (h < 9) return "jejum";
-  if (h < 11) return "depois_cafe";
-  if (h < 13) return "antes_almoco";
-  if (h < 16) return "depois_almoco";
-  if (h < 19) return "antes_jantar";
-  if (h < 22) return "depois_jantar";
-  return "madrugada";
-}
-
 function NewMeasurement() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const qc = useQueryClient();
-
-  const [glucose, setGlucose] = useState("");
-  const [period, setPeriod] = useState(suggestPeriod());
-  const [insulinUnits, setInsulinUnits] = useState("");
-  const [insulinType, setInsulinType] = useState("");
+  const [glucose, setGlucose] = useState("112");
+  const [period, setPeriod] = useState<PeriodId>("jejum");
+  const [insulinUnits, setInsulinUnits] = useState(0);
+  const [insulinType, setInsulinType] = useState("Rápida");
   const [notes, setNotes] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
-  const value = parseInt(glucose, 10);
-  const status = useMemo(() => (value ? classify(value) : null), [value]);
+  const glucoseValue = useMemo(() => Number(glucose), [glucose]);
+  const canSave = glucoseValue >= 10 && glucoseValue <= 800;
 
-  async function save() {
-    if (!value || value < 10 || value > 800) {
-      toast.error("Informe um valor de glicemia válido");
-      return;
-    }
-    setSaving(true);
-    try {
-      const { error } = await supabase.from("measurements").insert({
-        user_id: user!.id,
-        glucose_value: value,
-        period,
-        insulin_units: insulinUnits ? Number(insulinUnits) : null,
-        insulin_type: insulinType || null,
-        notes: notes || null,
-        measured_at: new Date().toISOString(),
-      });
-      if (error) throw error;
-      qc.invalidateQueries({ queryKey: ["measurements-recent"] });
-      qc.invalidateQueries({ queryKey: ["measurements"] });
-      toast.success("Registrado! 🎉");
-      navigate({ to: "/app" });
-    } catch (e: any) {
-      toast.error(e.message ?? "Erro ao salvar");
-    } finally {
-      setSaving(false);
-    }
+  function save() {
+    if (!canSave) return;
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 2200);
   }
 
   return (
-    <div className="pt-4">
-      <button
-        onClick={() => navigate({ to: "/app" })}
-        className="flex items-center gap-1.5 rounded-full bg-card px-3 py-2 text-sm font-bold shadow-soft"
-      >
-        <ArrowLeft className="h-4 w-4" /> Voltar
-      </button>
+    <div className="space-y-4 pb-2 pt-2">
+      <header>
+        <p className="text-sm font-black uppercase tracking-wide text-[#5e8e57]">Registrar</p>
+        <h1 className="text-3xl font-black text-[#4a3828]">Nova medição</h1>
+        <p className="mt-1 text-sm font-bold text-[#7c6242]">
+          O caminho rápido: valor, período e salvar.
+        </p>
+      </header>
 
-      <div className="mt-4 flex items-center gap-3">
-        <Mascot size={56} />
-        <div>
-          <h1 className="text-2xl">Nova medição</h1>
-          <p className="text-xs text-muted-foreground">Leva menos de 10 segundos ⚡</p>
-        </div>
-      </div>
-
-      {/* Glucose */}
-      <div className="mt-6 rounded-3xl bg-card p-5 shadow-soft">
-        <label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-          Glicemia (mg/dL)
-        </label>
-        <input
-          inputMode="numeric"
-          pattern="[0-9]*"
-          autoFocus
-          value={glucose}
-          onChange={(e) => setGlucose(e.target.value.replace(/\D/g, "").slice(0, 3))}
-          placeholder="0"
-          className="mt-1 w-full bg-transparent text-6xl font-black tabular-nums outline-none placeholder:text-muted-foreground/30"
-        />
-        {status && (
-          <div
-            className={`mt-1 inline-block rounded-full border px-3 py-1 text-xs font-bold ${
-              status === "low"
-                ? "border-warning/30 bg-warning/15 text-warning"
-                : status === "high"
-                ? "border-destructive/30 bg-destructive/10 text-destructive"
-                : "border-success/30 bg-success/15 text-success"
-            }`}
-          >
-            {statusLabel(status)} {status === "low" && "— atenção!"}{" "}
-            {status === "high" && "— atenção!"}
+      {saved && (
+        <div className="flex items-center gap-3 rounded-[1.25rem] border-2 border-[#82cf67] bg-[#B8E986] px-4 py-3 text-[#315b25] shadow-cozy">
+          <CheckCircle2 className="h-6 w-6" />
+          <div>
+            <p className="text-sm font-black">Registro salvo no diário</p>
+            <p className="text-xs font-bold">A missão avançou mais um passo.</p>
           </div>
-        )}
-      </div>
-
-      {/* Period */}
-      <div className="mt-4">
-        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-          Período do dia
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          {PERIODS.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setPeriod(p.value)}
-              className={`flex items-center gap-2 rounded-2xl border-2 p-3 text-left text-sm font-bold transition ${
-                period === p.value
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-transparent bg-card shadow-soft"
-              }`}
-            >
-              <span className="text-xl">{p.emoji}</span>
-              <span>{p.label}</span>
-            </button>
-          ))}
         </div>
-      </div>
+      )}
 
-      {/* Insulin */}
-      <div className="mt-4 rounded-3xl bg-card p-4 shadow-soft">
-        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-          Insulina (opcional)
-        </p>
-        <div className="flex gap-2">
+      <CozyCard className="p-5">
+        <label className="text-xs font-black uppercase tracking-wide text-[#7c6242]">
+          Glicemia mg/dL
+        </label>
+        <div className="mt-2 flex items-end gap-3">
           <input
-            inputMode="decimal"
-            value={insulinUnits}
-            onChange={(e) => setInsulinUnits(e.target.value.replace(",", "."))}
-            placeholder="0"
-            className="w-24 rounded-xl bg-input px-3 py-3 text-center text-lg font-bold tabular-nums outline-none focus:bg-card"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={glucose}
+            onChange={(event) => setGlucose(event.target.value.replace(/\D/g, "").slice(0, 3))}
+            className="w-full bg-transparent text-7xl font-black leading-none text-[#4a3828] outline-none placeholder:text-[#d8bd8d]"
+            placeholder="000"
+            autoFocus
           />
-          <select
-            value={insulinType}
-            onChange={(e) => setInsulinType(e.target.value)}
-            className="flex-1 rounded-xl bg-input px-3 py-3 text-sm font-bold outline-none focus:bg-card"
-          >
-            <option value="">Tipo de insulina</option>
-            {INSULIN_TYPES.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
+          {canSave && (
+            <div className="mb-2 shrink-0">
+              <GlucoseStatusBadge value={glucoseValue} />
+            </div>
+          )}
         </div>
-      </div>
+        {!canSave && (
+          <p className="mt-2 text-sm font-bold text-[#9a5f21]">Digite um valor entre 10 e 800.</p>
+        )}
+      </CozyCard>
 
-      {/* Notes */}
-      <div className="mt-4 rounded-3xl bg-card p-4 shadow-soft">
-        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-          Observações (opcional)
-        </p>
+      <section>
+        <div className="mb-2 flex items-center gap-2">
+          <Leaf className="h-5 w-5 text-[#5e8e57]" />
+          <h2 className="text-sm font-black uppercase tracking-wide text-[#5e8e57]">
+            Período do dia
+          </h2>
+        </div>
+        <PeriodSelector value={period} onChange={setPeriod} />
+      </section>
+
+      <CozyCard>
+        <h2 className="text-sm font-black uppercase tracking-wide text-[#7c6242]">
+          Insulina opcional
+        </h2>
+        <div className="mt-3">
+          <InsulinStepper value={insulinUnits} onChange={setInsulinUnits} />
+        </div>
+        <select
+          value={insulinType}
+          onChange={(event) => setInsulinType(event.target.value)}
+          className="mt-3 h-14 w-full rounded-2xl border-2 border-[#dcbf8b] bg-[#fffdf4] px-4 text-sm font-black text-[#4a3828] outline-none focus:border-[#A67C52]"
+        >
+          {insulinTypes.map((type) => (
+            <option key={type} value={type}>
+              {type}
+            </option>
+          ))}
+        </select>
+      </CozyCard>
+
+      <CozyCard>
+        <label className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-[#7c6242]">
+          <NotebookPen className="h-5 w-5" />
+          Observações
+        </label>
         <textarea
           value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={2}
-          placeholder="Ex.: comi pizza, estava ansiosa..."
-          className="w-full resize-none rounded-xl bg-input px-3 py-2.5 text-sm outline-none focus:bg-card"
+          onChange={(event) => setNotes(event.target.value)}
+          rows={3}
+          placeholder="Ex.: caminhei, comi fora, estava ansiosa..."
+          className="mt-3 w-full resize-none rounded-2xl border-2 border-[#dcbf8b] bg-[#fffdf4] px-4 py-3 text-sm font-bold text-[#4a3828] outline-none placeholder:text-[#b49463] focus:border-[#A67C52]"
         />
-      </div>
+      </CozyCard>
 
       <button
+        type="button"
         onClick={save}
-        disabled={saving}
-        className="mt-6 w-full rounded-2xl bg-gradient-primary py-4 text-base font-extrabold text-primary-foreground shadow-cute transition active:scale-[0.98] disabled:opacity-60"
+        disabled={!canSave}
+        className="min-h-16 w-full rounded-[1.35rem] border-2 border-[#8b613b] bg-[#7CC576] px-5 text-lg font-black text-white shadow-cozy transition active:scale-[0.98] disabled:opacity-50"
       >
-        {saving ? "Salvando..." : "Salvar medição 💖"}
+        Salvar Registro
       </button>
     </div>
   );

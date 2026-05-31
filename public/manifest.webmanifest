@@ -1,12 +1,12 @@
 {
-  "name": "DailyGlico",
-  "short_name": "DailyGlico",
-  "description": "Diário fofo de glicemia e insulina",
+  "name": "dailyglico",
+  "short_name": "dailyglico",
+  "description": "Diário glicêmico cozy e mobile-first",
   "start_url": "/app",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#fdf3f0",
-  "theme_color": "#f06b5e",
+  "background_color": "#FFF7E6",
+  "theme_color": "#8CCAF7",
   "orientation": "portrait",
   "icons": [
     {
