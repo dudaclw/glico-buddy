@@ -14,7 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      measurements: {
+        Row: {
+          created_at: string
+          glucose_value: number
+          id: string
+          insulin_type: string | null
+          insulin_units: number | null
+          measured_at: string
+          notes: string | null
+          period: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          glucose_value: number
+          id?: string
+          insulin_type?: string | null
+          insulin_units?: number | null
+          measured_at?: string
+          notes?: string | null
+          period: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          glucose_value?: number
+          id?: string
+          insulin_type?: string | null
+          insulin_units?: number | null
+          measured_at?: string
+          notes?: string | null
+          period?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          birth_date: string | null
+          created_at: string
+          diabetes_type: string | null
+          id: string
+          name: string | null
+          target_max: number
+          target_min: number
+          updated_at: string
+        }
+        Insert: {
+          birth_date?: string | null
+          created_at?: string
+          diabetes_type?: string | null
+          id: string
+          name?: string | null
+          target_max?: number
+          target_min?: number
+          updated_at?: string
+        }
+        Update: {
+          birth_date?: string | null
+          created_at?: string
+          diabetes_type?: string | null
+          id?: string
+          name?: string | null
+          target_max?: number
+          target_min?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
