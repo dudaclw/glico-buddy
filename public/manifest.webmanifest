@@ -1,0 +1,25 @@
+{
+  "name": "DailyGlico",
+  "short_name": "DailyGlico",
+  "description": "Diário fofo de glicemia e insulina",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fdf3f0",
+  "theme_color": "#f06b5e",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
