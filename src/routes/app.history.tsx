@@ -1,29 +1,39 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CalendarDays, Filter } from "lucide-react";
+import { CalendarDays, Filter, Save, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { CozyCard, MeasurementCard } from "@/components/cozy";
-import { measurements } from "@/lib/prototype-data";
+import {
+  CozyCard,
+  GlucoseStatusBadge,
+  InsulinStepper,
+  MeasurementCard,
+  PeriodSelector,
+} from "@/components/cozy";
+import { useMeasurements } from "@/hooks/useMeasurements";
+import type { Measurement, PeriodId } from "@/types/measurement";
+import { getMonthKey, groupMeasurementsByDate } from "@/utils/measurementCalculations";
 
 export const Route = createFileRoute("/app/history")({
   component: History,
 });
 
 function History() {
-  const [month, setMonth] = useState("2026-05");
+  const [month, setMonth] = useState(getMonthKey());
+  const [editing, setEditing] = useState<Measurement | null>(null);
+  const { measurements, updateMeasurement, deleteMeasurement } = useMeasurements();
 
   const filtered = useMemo(
-    () => measurements.filter((item) => item.measuredAt.startsWith(month)),
-    [month],
+    () => measurements.filter((item) => item.date.startsWith(month)),
+    [measurements, month],
   );
 
-  const groups = useMemo(() => {
-    const map = new Map<string, typeof filtered>();
-    filtered.forEach((item) => {
-      const key = item.measuredAt.slice(0, 10);
-      map.set(key, [...(map.get(key) ?? []), item]);
-    });
-    return Array.from(map.entries());
-  }, [filtered]);
+  const groups = useMemo(() => groupMeasurementsByDate(filtered), [filtered]);
+
+  function confirmDelete(measurement: Measurement) {
+    const confirmed = window.confirm("Excluir esta medição do diário?");
+    if (!confirmed) return;
+    deleteMeasurement(measurement.id);
+    if (editing?.id === measurement.id) setEditing(null);
+  }
 
   return (
     <div className="space-y-4 pt-2">
@@ -48,6 +58,17 @@ function History() {
         />
       </CozyCard>
 
+      {editing && (
+        <EditMeasurementCard
+          measurement={editing}
+          onCancel={() => setEditing(null)}
+          onSave={(measurement) => {
+            updateMeasurement(editing.id, measurement);
+            setEditing(null);
+          }}
+        />
+      )}
+
       <CozyCard variant="sky" className="p-3">
         <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-black">
           <span className="rounded-2xl border-2 border-[#72b9ee] bg-[#A7D8FF] px-2 py-2 text-[#255a7c]">
@@ -62,23 +83,163 @@ function History() {
         </div>
       </CozyCard>
 
-      {groups.map(([date, list]) => (
-        <section key={date} className="space-y-2">
-          <div className="flex items-center gap-2 px-1 text-[#5e8e57]">
-            <CalendarDays className="h-5 w-5" />
-            <h2 className="text-sm font-black uppercase tracking-wide">
-              {new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", {
-                weekday: "long",
-                day: "2-digit",
-                month: "long",
-              })}
-            </h2>
-          </div>
-          {list.map((measurement) => (
-            <MeasurementCard key={measurement.id} measurement={measurement} />
-          ))}
-        </section>
-      ))}
+      {groups.length === 0 ? (
+        <CozyCard>
+          <p className="text-base font-black text-[#4a3828]">Nenhuma medição registrada ainda.</p>
+          <p className="mt-1 text-sm font-bold text-[#8a6b45]">
+            Cadastre sua primeira glicemia para visualizar o histórico.
+          </p>
+        </CozyCard>
+      ) : (
+        groups.map(([date, list]) => (
+          <section key={date} className="space-y-2">
+            <div className="flex items-center gap-2 px-1 text-[#5e8e57]">
+              <CalendarDays className="h-5 w-5" />
+              <h2 className="text-sm font-black uppercase tracking-wide">
+                {new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", {
+                  weekday: "long",
+                  day: "2-digit",
+                  month: "long",
+                })}
+              </h2>
+            </div>
+            {list.map((measurement) => (
+              <MeasurementCard
+                key={measurement.id}
+                measurement={measurement}
+                onEdit={setEditing}
+                onDelete={confirmDelete}
+              />
+            ))}
+          </section>
+        ))
+      )}
     </div>
+  );
+}
+
+function EditMeasurementCard({
+  measurement,
+  onCancel,
+  onSave,
+}: {
+  measurement: Measurement;
+  onCancel: () => void;
+  onSave: (measurement: Omit<Measurement, "id" | "createdAt" | "updatedAt">) => void;
+}) {
+  const [date, setDate] = useState(measurement.date);
+  const [time, setTime] = useState(measurement.time ?? "");
+  const [period, setPeriod] = useState<PeriodId>(measurement.period);
+  const [glucose, setGlucose] = useState(String(measurement.glucoseValue));
+  const [insulinUnits, setInsulinUnits] = useState(measurement.insulinUnits ?? 0);
+  const [notes, setNotes] = useState(measurement.notes ?? "");
+  const glucoseValue = Number(glucose);
+  const canSave = Boolean(date) && Boolean(period) && glucoseValue > 0 && insulinUnits >= 0;
+
+  return (
+    <CozyCard className="p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-black text-[#4a3828]">Editar medição</h2>
+          <p className="text-xs font-bold text-[#8a6b45]">Atualiza o mesmo registro no diário.</p>
+        </div>
+        <button
+          type="button"
+          onClick={onCancel}
+          aria-label="Cancelar edição"
+          className="grid h-10 w-10 place-items-center rounded-xl border-2 border-[#dcbf8b] bg-[#fffdf4] text-[#765739]"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Data">
+          <input
+            type="date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+            className="cozy-input"
+          />
+        </Field>
+        <Field label="Horário">
+          <input
+            type="time"
+            value={time}
+            onChange={(event) => setTime(event.target.value)}
+            className="cozy-input"
+          />
+        </Field>
+      </div>
+
+      <div className="mt-3">
+        <Field label="Glicemia mg/dL">
+          <div className="flex items-center gap-2">
+            <input
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={glucose}
+              onChange={(event) => setGlucose(event.target.value.replace(/\D/g, "").slice(0, 3))}
+              className="cozy-input"
+            />
+            {glucoseValue > 0 && <GlucoseStatusBadge value={glucoseValue} />}
+          </div>
+        </Field>
+      </div>
+
+      <div className="mt-3">
+        <p className="mb-2 text-xs font-black uppercase tracking-wide text-[#7c6242]">
+          Período do dia
+        </p>
+        <PeriodSelector value={period} onChange={setPeriod} />
+      </div>
+
+      <div className="mt-3">
+        <Field label="Insulina">
+          <InsulinStepper value={insulinUnits} onChange={setInsulinUnits} />
+        </Field>
+      </div>
+
+      <div className="mt-3">
+        <Field label="Observações">
+          <textarea
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            rows={3}
+            className="cozy-input min-h-24 resize-none py-3"
+          />
+        </Field>
+      </div>
+
+      <button
+        type="button"
+        disabled={!canSave}
+        onClick={() =>
+          onSave({
+            date,
+            time,
+            period,
+            glucoseValue,
+            insulinUnits,
+            notes,
+          })
+        }
+        className="mt-4 flex min-h-14 w-full items-center justify-center gap-2 rounded-[1.2rem] border-2 border-[#8b613b] bg-[#7CC576] px-5 text-base font-black text-white shadow-cozy transition active:scale-[0.98] disabled:opacity-50"
+      >
+        <Save className="h-5 w-5" />
+        Salvar alterações
+      </button>
+    </CozyCard>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-black uppercase tracking-wide text-[#7c6242]">
+        {label}
+      </span>
+      {children}
+    </label>
   );
 }

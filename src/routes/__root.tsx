@@ -63,7 +63,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "dailyglico — diário glicêmico cozy" },
       {
         name: "description",
-        content: "Protótipo mobile-first para registro glicêmico rápido e acolhedor.",
+        content: "Diário mobile-first para registro glicêmico rápido e acolhedor.",
       },
       { property: "og:title", content: "DailyGlico" },
       { property: "og:description", content: "Diário de glicemia simples, cozy e prático." },

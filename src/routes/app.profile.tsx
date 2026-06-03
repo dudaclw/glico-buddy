@@ -8,7 +8,7 @@ export const Route = createFileRoute("/app/profile")({
 });
 
 function Profile() {
-  const [name, setName] = useState("Ana");
+  const [name, setName] = useState("");
   const [diabetesType, setDiabetesType] = useState("Tipo 1");
   const [targetMin, setTargetMin] = useState("70");
   const [targetMax, setTargetMax] = useState("180");
@@ -33,7 +33,7 @@ function Profile() {
           </span>
           <div>
             <h2 className="text-lg font-black">Dados do jogador</h2>
-            <p className="text-xs font-bold text-[#8a6b45]">Informações usadas no protótipo</p>
+            <p className="text-xs font-bold text-[#8a6b45]">Informações locais do diário</p>
           </div>
         </div>
 
@@ -42,6 +42,7 @@ function Profile() {
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
+              placeholder="Seu nome"
               className="cozy-input"
             />
           </Field>

@@ -2,9 +2,11 @@ import type { ReactNode } from "react";
 import {
   Bed,
   Coffee,
+  Edit3,
+  HelpCircle,
   Moon,
   Plus,
-  Sandwich,
+  Trash2,
   Soup,
   Star,
   Sun,
@@ -14,25 +16,27 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  getGlucoseStatus,
   getPeriodLabel,
-  getStatusLabel,
   periods,
-  type GlucoseStatus,
+  TARGET_MAX,
+  TARGET_MIN,
   type Measurement,
   type PeriodId,
-} from "@/lib/prototype-data";
+} from "@/types/measurement";
+
+type GlucoseStatus = "low" | "ideal" | "high";
 
 const periodIcons: Record<PeriodId, typeof Sun> = {
   jejum: Sunrise,
-  cafe: Coffee,
+  antes_cafe: Coffee,
+  depois_cafe: Coffee,
   antes_almoco: Utensils,
-  apos_almoco: Soup,
-  cafe_tarde: Sandwich,
+  depois_almoco: Soup,
   antes_jantar: Sunset,
-  apos_jantar: Utensils,
-  dormir: Bed,
+  depois_jantar: Utensils,
+  antes_dormir: Bed,
   madrugada: Moon,
+  outro: HelpCircle,
 };
 
 const statusClasses: Record<GlucoseStatus, string> = {
@@ -40,6 +44,18 @@ const statusClasses: Record<GlucoseStatus, string> = {
   ideal: "border-[#82cf67] bg-[#B8E986] text-[#315b25]",
   high: "border-[#f1a85f] bg-[#FFC48C] text-[#75451b]",
 };
+
+function getGlucoseStatus(value: number): GlucoseStatus {
+  if (value < TARGET_MIN) return "low";
+  if (value > TARGET_MAX) return "high";
+  return "ideal";
+}
+
+function getStatusLabel(status: GlucoseStatus) {
+  if (status === "low") return "Hipo";
+  if (status === "high") return "Alta";
+  return "Ideal";
+}
 
 export function CozyCard({
   children,
@@ -235,8 +251,15 @@ export function InsulinStepper({
   );
 }
 
-export function MeasurementCard({ measurement }: { measurement: Measurement }) {
-  const date = new Date(measurement.measuredAt);
+export function MeasurementCard({
+  measurement,
+  onEdit,
+  onDelete,
+}: {
+  measurement: Measurement;
+  onEdit?: (measurement: Measurement) => void;
+  onDelete?: (measurement: Measurement) => void;
+}) {
   return (
     <CozyCard className="p-3">
       <div className="flex items-center gap-3">
@@ -251,7 +274,7 @@ export function MeasurementCard({ measurement }: { measurement: Measurement }) {
             {getPeriodLabel(measurement.period)}
           </p>
           <p className="text-xs font-bold text-[#8a6b45]">
-            {date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+            {measurement.time || "Sem horário"}
             {measurement.insulinUnits ? ` · ${measurement.insulinUnits}U` : ""}
           </p>
           {measurement.notes && (
@@ -262,12 +285,36 @@ export function MeasurementCard({ measurement }: { measurement: Measurement }) {
         </div>
         <div className="text-right">
           <div className="text-2xl font-black leading-none text-[#4a3828]">
-            {measurement.glucose}
+            {measurement.glucoseValue}
           </div>
           <div className="mt-1">
-            <GlucoseStatusBadge value={measurement.glucose} />
+            <GlucoseStatusBadge value={measurement.glucoseValue} />
           </div>
         </div>
+        {(onEdit || onDelete) && (
+          <div className="grid gap-2">
+            {onEdit && (
+              <button
+                type="button"
+                onClick={() => onEdit(measurement)}
+                aria-label="Editar medição"
+                className="grid h-9 w-9 place-items-center rounded-xl border-2 border-[#dcbf8b] bg-[#fffdf4] text-[#765739] active:scale-95"
+              >
+                <Edit3 className="h-4 w-4" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(measurement)}
+                aria-label="Excluir medição"
+                className="grid h-9 w-9 place-items-center rounded-xl border-2 border-[#e6a07b] bg-[#ffe4d2] text-[#8f3f28] active:scale-95"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </CozyCard>
   );

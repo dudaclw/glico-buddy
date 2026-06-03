@@ -9,6 +9,11 @@ export default defineConfig({
   plugins: [
     tsConfigPaths(),
     tanstackStart({
+      router: {
+        codeSplittingOptions: {
+          defaultBehavior: [],
+        },
+      },
       server: { entry: "server" },
     }),
     nitro({

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Activity, ArrowDown, ArrowUp, BarChart3, Hash, TrendingUp } from "lucide-react";
+import { Activity, ArrowDown, ArrowUp, BarChart3, Hash, Layers3, TrendingUp } from "lucide-react";
 import {
   CartesianGrid,
   Line,
@@ -11,27 +11,23 @@ import {
   YAxis,
 } from "recharts";
 import { CozyCard, StatCard } from "@/components/cozy";
-import { averageGlucose, measurements, TARGET_MAX, TARGET_MIN } from "@/lib/prototype-data";
+import { useMeasurements } from "@/hooks/useMeasurements";
+import { TARGET_MAX, TARGET_MIN } from "@/types/measurement";
+import {
+  getChartData,
+  getMeasurementSummary,
+  getPeriodGroups,
+} from "@/utils/measurementCalculations";
 
 export const Route = createFileRoute("/app/reports")({
   component: Reports,
 });
 
 function Reports() {
-  const average7 = averageGlucose(measurements.slice(0, 7));
-  const average30 = averageGlucose(measurements);
-  const highest = Math.max(...measurements.map((item) => item.glucose));
-  const lowest = Math.min(...measurements.map((item) => item.glucose));
-  const chartData = measurements
-    .slice()
-    .reverse()
-    .map((item) => ({
-      day: new Date(item.measuredAt).toLocaleDateString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-      }),
-      glicemia: item.glucose,
-    }));
+  const { measurements } = useMeasurements();
+  const summary = getMeasurementSummary(measurements);
+  const chartData = getChartData(measurements);
+  const periodGroups = getPeriodGroups(measurements).filter((item) => item.count > 0);
 
   return (
     <div className="space-y-4 pt-2">
@@ -46,34 +42,34 @@ function Reports() {
       <div className="grid grid-cols-2 gap-3">
         <StatCard
           icon={<TrendingUp className="h-5 w-5" />}
-          label="Média 7 dias"
-          value={`${average7}`}
-          helper="mg/dL"
+          label="Média geral"
+          value={summary.averageAll === null ? "--" : `${summary.averageAll}`}
+          helper={summary.averageAll === null ? "sem registros" : "mg/dL"}
         />
         <StatCard
           icon={<Activity className="h-5 w-5" />}
-          label="Média 30 dias"
-          value={`${average30}`}
-          helper="mg/dL"
+          label="Média do mês"
+          value={summary.averageMonth === null ? "--" : `${summary.averageMonth}`}
+          helper={summary.averageMonth === null ? "sem registros" : "mg/dL"}
         />
         <StatCard
           icon={<ArrowUp className="h-5 w-5" />}
           label="Maior"
-          value={`${highest}`}
-          helper="mg/dL"
+          value={summary.highest ? `${summary.highest.glucoseValue}` : "--"}
+          helper={summary.highest ? "mg/dL" : "sem registros"}
         />
         <StatCard
           icon={<ArrowDown className="h-5 w-5" />}
           label="Menor"
-          value={`${lowest}`}
-          helper="mg/dL"
+          value={summary.lowest ? `${summary.lowest.glucoseValue}` : "--"}
+          helper={summary.lowest ? "mg/dL" : "sem registros"}
         />
       </div>
 
       <StatCard
         icon={<Hash className="h-5 w-5" />}
         label="Total de medições"
-        value={`${measurements.length}`}
+        value={`${summary.totalCount}`}
         helper="registros no diário"
       />
 
@@ -88,32 +84,79 @@ function Reports() {
           </div>
         </div>
         <div className="h-64 rounded-3xl border-2 border-[#9ccded] bg-[#fffdf4] p-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 12, right: 10, left: -18, bottom: 0 }}>
-              <CartesianGrid stroke="#ead7ad" strokeDasharray="4 4" />
-              <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#7c6242", fontWeight: 800 }} />
-              <YAxis domain={[40, 230]} tick={{ fontSize: 10, fill: "#7c6242", fontWeight: 800 }} />
-              <ReferenceArea y1={TARGET_MIN} y2={TARGET_MAX} fill="#B8E986" fillOpacity={0.25} />
-              <Tooltip
-                contentStyle={{
-                  background: "#FFF7E6",
-                  border: "2px solid #A67C52",
-                  borderRadius: 16,
-                  color: "#4a3828",
-                  fontWeight: 800,
-                }}
-              />
-              <Line
-                type="monotone"
-                dataKey="glicemia"
-                stroke="#7CC576"
-                strokeWidth={4}
-                dot={{ r: 5, fill: "#F7D66B", stroke: "#A67C52", strokeWidth: 2 }}
-                activeDot={{ r: 7, fill: "#FFC48C", stroke: "#A67C52", strokeWidth: 2 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          {chartData.length === 0 ? (
+            <div className="grid h-full place-items-center px-4 text-center">
+              <div>
+                <p className="text-base font-black text-[#4a3828]">
+                  Os gráficos aparecerão após seus primeiros registros.
+                </p>
+                <p className="mt-1 text-sm font-bold text-[#8a6b45]">
+                  Nenhuma medição registrada ainda.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 12, right: 10, left: -18, bottom: 0 }}>
+                <CartesianGrid stroke="#ead7ad" strokeDasharray="4 4" />
+                <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#7c6242", fontWeight: 800 }} />
+                <YAxis
+                  domain={[40, 230]}
+                  tick={{ fontSize: 10, fill: "#7c6242", fontWeight: 800 }}
+                />
+                <ReferenceArea y1={TARGET_MIN} y2={TARGET_MAX} fill="#B8E986" fillOpacity={0.25} />
+                <Tooltip
+                  contentStyle={{
+                    background: "#FFF7E6",
+                    border: "2px solid #A67C52",
+                    borderRadius: 16,
+                    color: "#4a3828",
+                    fontWeight: 800,
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="glicemia"
+                  stroke="#7CC576"
+                  strokeWidth={4}
+                  dot={{ r: 5, fill: "#F7D66B", stroke: "#A67C52", strokeWidth: 2 }}
+                  activeDot={{ r: 7, fill: "#FFC48C", stroke: "#A67C52", strokeWidth: 2 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </div>
+      </CozyCard>
+
+      <CozyCard>
+        <div className="mb-3 flex items-center gap-2">
+          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#F7D66B] text-[#7b5a35]">
+            <Layers3 className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 className="text-base font-black text-[#4a3828]">Por período</h2>
+            <p className="text-xs font-bold text-[#8a6b45]">Agrupamento dos seus registros</p>
+          </div>
+        </div>
+        {periodGroups.length === 0 ? (
+          <p className="rounded-2xl bg-[#fffdf4] px-3 py-3 text-sm font-bold text-[#8a6b45]">
+            Nenhuma medição registrada ainda.
+          </p>
+        ) : (
+          <div className="grid gap-2">
+            {periodGroups.map((item) => (
+              <div
+                key={item.period}
+                className="flex items-center justify-between rounded-2xl bg-[#fffdf4] px-3 py-3 text-sm font-black text-[#6f5738]"
+              >
+                <span>{item.label}</span>
+                <span>
+                  {item.count} reg. {item.average ? `· média ${item.average}` : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </CozyCard>
     </div>
   );

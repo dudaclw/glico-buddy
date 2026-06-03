@@ -1,27 +1,50 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, Leaf, NotebookPen } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, Droplet, Leaf, NotebookPen } from "lucide-react";
 import { useMemo, useState } from "react";
 import { CozyCard, GlucoseStatusBadge, InsulinStepper, PeriodSelector } from "@/components/cozy";
-import { insulinTypes, type PeriodId } from "@/lib/prototype-data";
+import { useMeasurements } from "@/hooks/useMeasurements";
+import type { PeriodId } from "@/types/measurement";
+import { formatDateKey } from "@/utils/measurementCalculations";
 
 export const Route = createFileRoute("/app/new")({
   component: NewMeasurement,
 });
 
 function NewMeasurement() {
-  const [glucose, setGlucose] = useState("112");
+  const now = useMemo(() => new Date(), []);
+  const [date, setDate] = useState(formatDateKey(now));
+  const [time, setTime] = useState(
+    `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+  );
+  const [glucose, setGlucose] = useState("");
   const [period, setPeriod] = useState<PeriodId>("jejum");
   const [insulinUnits, setInsulinUnits] = useState(0);
-  const [insulinType, setInsulinType] = useState("Rápida");
   const [notes, setNotes] = useState("");
   const [saved, setSaved] = useState(false);
+  const { createMeasurement } = useMeasurements();
 
   const glucoseValue = useMemo(() => Number(glucose), [glucose]);
-  const canSave = glucoseValue >= 10 && glucoseValue <= 800;
+  const canSave =
+    Boolean(date) &&
+    Boolean(period) &&
+    Boolean(glucose) &&
+    Number.isFinite(glucoseValue) &&
+    glucoseValue > 0 &&
+    insulinUnits >= 0;
 
   function save() {
     if (!canSave) return;
+    createMeasurement({
+      date,
+      time,
+      period,
+      glucoseValue,
+      insulinUnits,
+      notes,
+    });
     setSaved(true);
+    setGlucose("");
+    setNotes("");
     window.setTimeout(() => setSaved(false), 2200);
   }
 
@@ -59,16 +82,45 @@ function NewMeasurement() {
             placeholder="000"
             autoFocus
           />
-          {canSave && (
+          {glucoseValue > 0 && (
             <div className="mb-2 shrink-0">
               <GlucoseStatusBadge value={glucoseValue} />
             </div>
           )}
         </div>
-        {!canSave && (
-          <p className="mt-2 text-sm font-bold text-[#9a5f21]">Digite um valor entre 10 e 800.</p>
+        {glucose && glucoseValue <= 0 && (
+          <p className="mt-2 text-sm font-bold text-[#9a5f21]">
+            Glicemia deve ser um número positivo.
+          </p>
         )}
       </CozyCard>
+
+      <div className="grid grid-cols-2 gap-3">
+        <CozyCard className="p-3">
+          <label className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-[#7c6242]">
+            <CalendarDays className="h-4 w-4" />
+            Data
+          </label>
+          <input
+            type="date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+            className="cozy-input mt-2"
+          />
+        </CozyCard>
+        <CozyCard className="p-3">
+          <label className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-[#7c6242]">
+            <Clock3 className="h-4 w-4" />
+            Horário
+          </label>
+          <input
+            type="time"
+            value={time}
+            onChange={(event) => setTime(event.target.value)}
+            className="cozy-input mt-2"
+          />
+        </CozyCard>
+      </div>
 
       <section>
         <div className="mb-2 flex items-center gap-2">
@@ -81,23 +133,16 @@ function NewMeasurement() {
       </section>
 
       <CozyCard>
-        <h2 className="text-sm font-black uppercase tracking-wide text-[#7c6242]">
-          Insulina opcional
+        <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-[#7c6242]">
+          <Droplet className="h-5 w-5" />
+          Insulina aplicada
         </h2>
         <div className="mt-3">
           <InsulinStepper value={insulinUnits} onChange={setInsulinUnits} />
         </div>
-        <select
-          value={insulinType}
-          onChange={(event) => setInsulinType(event.target.value)}
-          className="mt-3 h-14 w-full rounded-2xl border-2 border-[#dcbf8b] bg-[#fffdf4] px-4 text-sm font-black text-[#4a3828] outline-none focus:border-[#A67C52]"
-        >
-          {insulinTypes.map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
-          ))}
-        </select>
+        <p className="mt-2 text-xs font-bold text-[#8a6b45]">
+          Use zero se nenhuma unidade foi aplicada.
+        </p>
       </CozyCard>
 
       <CozyCard>
