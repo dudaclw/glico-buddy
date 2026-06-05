@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "../components/ui/sonner";
+import { useTheme } from "@/hooks/useTheme";
 
 function NotFoundComponent() {
   return (
@@ -102,6 +103,8 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useTheme();
+
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />

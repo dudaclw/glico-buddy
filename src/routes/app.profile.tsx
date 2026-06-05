@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Bell, Brush, ChevronRight, Moon, Palette, ShieldCheck, UserRound } from "lucide-react";
 import { useState } from "react";
 import { CozyCard, PixelMascot } from "@/components/cozy";
+import { useTheme } from "@/hooks/useTheme";
 
 export const Route = createFileRoute("/app/profile")({
   component: Profile,
@@ -14,6 +15,7 @@ function Profile() {
   const [targetMax, setTargetMax] = useState("180");
   const [cozyMode, setCozyMode] = useState(true);
   const [reminders, setReminders] = useState(true);
+  const { theme, setTheme } = useTheme();
 
   return (
     <div className="space-y-4 pt-2">
@@ -102,9 +104,9 @@ function Profile() {
         <SettingRow
           icon={<Moon className="h-5 w-5" />}
           label="Contraste noturno"
-          helper="Preparado para próxima versão"
-          active={false}
-          onClick={() => undefined}
+          helper="Alterna entre tema claro e escuro"
+          active={theme === "dark"}
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         />
       </CozyCard>
 
