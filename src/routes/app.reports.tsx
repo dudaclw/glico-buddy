@@ -1,5 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Activity, ArrowDown, ArrowUp, BarChart3, Hash, Layers3, TrendingUp } from "lucide-react";
+import {
+  Activity,
+  ArrowDown,
+  ArrowUp,
+  BarChart3,
+  CalendarDays,
+  Download,
+  FileJson,
+  Hash,
+  Layers3,
+  TrendingUp,
+  X,
+} from "lucide-react";
+import { useMemo, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -12,9 +25,10 @@ import {
 } from "recharts";
 import { CozyCard, StatCard } from "@/components/cozy";
 import { useMeasurements } from "@/hooks/useMeasurements";
-import { TARGET_MAX, TARGET_MIN } from "@/types/measurement";
+import { TARGET_MAX, TARGET_MIN, type Measurement } from "@/types/measurement";
 import {
   getChartData,
+  getMonthKey,
   getMeasurementSummary,
   getPeriodGroups,
 } from "@/utils/measurementCalculations";
@@ -72,6 +86,8 @@ function Reports() {
         value={`${summary.totalCount}`}
         helper="registros no diário"
       />
+
+      <ExportDataCard measurements={measurements} />
 
       <CozyCard variant="sky" className="p-4">
         <div className="mb-3 flex items-center gap-2">
@@ -160,4 +176,196 @@ function Reports() {
       </CozyCard>
     </div>
   );
+}
+
+function ExportDataCard({ measurements }: { measurements: Measurement[] }) {
+  const today = useMemo(() => new Date(), []);
+  const [open, setOpen] = useState(false);
+  const [startDate, setStartDate] = useState(getMonthKey(today) + "-01");
+  const [endDate, setEndDate] = useState(formatDateKey(today));
+  const [message, setMessage] = useState("");
+
+  const validationError = getExportValidationError(startDate, endDate);
+
+  function generateReport() {
+    const error = getExportValidationError(startDate, endDate);
+    if (error) {
+      setMessage(error);
+      return;
+    }
+
+    const selectedMeasurements = getMeasurementsInCreatedAtPeriod(
+      measurements,
+      startDate,
+      endDate,
+    );
+
+    if (selectedMeasurements.length === 0) {
+      setMessage("Nenhuma medição encontrada nesse período.");
+      return;
+    }
+
+    downloadJsonReport(buildExportReport(selectedMeasurements, startDate, endDate), startDate, endDate);
+    setMessage(`${selectedMeasurements.length} medições exportadas em JSON.`);
+  }
+
+  return (
+    <CozyCard variant="grass" className="p-4">
+      <div className="flex items-center gap-3">
+        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#F7D66B] text-[#765739]">
+          <FileJson className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-base font-black text-[#375629]">Relatório JSON</h2>
+          <p className="text-xs font-bold text-[#547d37]">
+            Gere um relatório local em formato JSON.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen((value) => !value);
+            setMessage("");
+          }}
+          aria-label={open ? "Fechar exportação" : "Abrir exportação de dados"}
+          className="flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border-2 border-[#8b613b] bg-[#fffdf4] px-3 text-sm font-black text-[#765739] active:scale-95"
+        >
+          {open ? <X className="h-5 w-5" /> : <Download className="h-5 w-5" />}
+          <span>{open ? "Fechar" : "Exportar dados"}</span>
+        </button>
+      </div>
+
+      {open && (
+        <div className="mt-4 grid gap-3 rounded-2xl border-2 border-[#b6d795] bg-[#fffdf4] p-3 shadow-tile">
+          <div className="grid grid-cols-2 gap-3">
+            <DateField label="Data inicial" value={startDate} onChange={setStartDate} />
+            <DateField label="Data final" value={endDate} onChange={setEndDate} />
+          </div>
+
+          {message && (
+            <p className="rounded-2xl bg-[#FFF7E6] px-3 py-2 text-sm font-black text-[#765739]">
+              {message}
+            </p>
+          )}
+
+          {!message && validationError && (
+            <p className="rounded-2xl bg-[#ffe4d2] px-3 py-2 text-sm font-black text-[#8f3f28]">
+              {validationError}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={generateReport}
+            className="flex min-h-14 w-full items-center justify-center gap-2 rounded-[1.2rem] border-2 border-[#8b613b] bg-[#7CC576] px-5 text-base font-black text-white shadow-cozy transition active:scale-[0.98]"
+          >
+            <Download className="h-5 w-5" />
+            Gerar relatório
+          </button>
+        </div>
+      )}
+    </CozyCard>
+  );
+}
+
+function DateField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 flex items-center gap-1 text-xs font-black uppercase tracking-wide text-[#7c6242]">
+        <CalendarDays className="h-4 w-4" />
+        {label}
+      </span>
+      <input
+        type="date"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="cozy-input"
+      />
+    </label>
+  );
+}
+
+function getExportValidationError(startDate: string, endDate: string) {
+  if (!startDate) return "Informe a data inicial.";
+  if (!endDate) return "Informe a data final.";
+  if (startDate > endDate) return "A data inicial não pode ser maior que a data final.";
+  return "";
+}
+
+function getMeasurementsInCreatedAtPeriod(
+  measurements: Measurement[],
+  startDate: string,
+  endDate: string,
+) {
+  const startTime = new Date(`${startDate}T00:00:00`).getTime();
+  const endTime = new Date(`${endDate}T23:59:59.999`).getTime();
+
+  return measurements
+    .filter((measurement) => {
+      const createdAtTime = new Date(measurement.createdAt).getTime();
+      return (
+        Number.isFinite(createdAtTime) &&
+        createdAtTime >= startTime &&
+        createdAtTime <= endTime
+      );
+    })
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+function buildExportReport(measurements: Measurement[], startDate: string, endDate: string) {
+  const glucoseValues = measurements.map((measurement) => measurement.glucose);
+  const totalGlucose = glucoseValues.reduce((total, value) => total + value, 0);
+
+  return {
+    exportedAt: new Date().toISOString(),
+    period: {
+      startDate,
+      endDate,
+    },
+    summary: {
+      totalMeasurements: measurements.length,
+      averageGlucose: Math.round(totalGlucose / measurements.length),
+      minGlucose: Math.min(...glucoseValues),
+      maxGlucose: Math.max(...glucoseValues),
+    },
+    measurements: measurements.map((measurement) => ({
+      id: measurement.id,
+      date: measurement.date,
+      time: measurement.time ?? null,
+      period: measurement.period,
+      glucose: measurement.glucose,
+      insulinUnits: measurement.insulinUnits ?? null,
+      notes: measurement.notes ?? null,
+    })),
+  };
+}
+
+function downloadJsonReport(report: unknown, startDate: string, endDate: string) {
+  const json = JSON.stringify(report, null, 2);
+  const blob = new Blob([json], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = `glicotrack-${startDate}-a-${endDate}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function formatDateKey(date: Date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
 }
