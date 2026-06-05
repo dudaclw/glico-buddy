@@ -28,10 +28,12 @@ type GlucoseStatus = "low" | "ideal" | "high";
 
 const periodIcons: Record<PeriodId, typeof Sun> = {
   jejum: Sunrise,
+  cafe_manha: Coffee,
   antes_cafe: Coffee,
   depois_cafe: Coffee,
   antes_almoco: Utensils,
   depois_almoco: Soup,
+  cafe_tarde: Coffee,
   antes_jantar: Sunset,
   depois_jantar: Utensils,
   antes_dormir: Bed,
@@ -186,7 +188,7 @@ export function PeriodSelector({
   value,
   onChange,
 }: {
-  value: PeriodId;
+  value: PeriodId | "";
   onChange: (period: PeriodId) => void;
 }) {
   return (

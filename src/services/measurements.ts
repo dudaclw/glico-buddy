@@ -5,10 +5,12 @@ export const MEASUREMENTS_CHANGED_EVENT = "glicotrack_measurements_changed";
 
 const periodIds: PeriodId[] = [
   "jejum",
+  "cafe_manha",
   "antes_cafe",
   "depois_cafe",
   "antes_almoco",
   "depois_almoco",
+  "cafe_tarde",
   "antes_jantar",
   "depois_jantar",
   "antes_dormir",
@@ -39,34 +41,40 @@ function isTimeKey(value: unknown) {
 function normalizeMeasurement(value: unknown): Measurement | null {
   if (!value || typeof value !== "object") return null;
   const item = value as Record<string, unknown>;
-  const glucoseValue = Number(item.glucoseValue);
+  const glucoseValue = Number(item.glucoseValue ?? item.glucose);
   const insulinUnits =
     item.insulinUnits === undefined || item.insulinUnits === ""
       ? undefined
       : Number(item.insulinUnits);
+  const createdAt = typeof item.createdAt === "string" ? item.createdAt : "";
+  const createdAtDate = createdAt ? createdAt.slice(0, 10) : "";
+  const createdAtTime = createdAt ? createdAt.slice(11, 16) : "";
+  const date = isDateKey(item.date) ? String(item.date) : createdAtDate;
+  const time = item.time || createdAtTime;
 
   if (
     typeof item.id !== "string" ||
-    !isDateKey(item.date) ||
-    !isTimeKey(item.time) ||
+    !isDateKey(date) ||
+    !isTimeKey(time) ||
     !isPeriodId(item.period) ||
     !Number.isFinite(glucoseValue) ||
     glucoseValue <= 0 ||
     (insulinUnits !== undefined && (!Number.isFinite(insulinUnits) || insulinUnits < 0)) ||
-    typeof item.createdAt !== "string"
+    !createdAt
   ) {
     return null;
   }
 
   return {
     id: String(item.id),
-    date: String(item.date),
-    time: item.time ? String(item.time) : undefined,
+    date,
+    time: time ? String(time) : undefined,
     period: item.period,
+    glucose: glucoseValue,
     glucoseValue,
     insulinUnits,
     notes: typeof item.notes === "string" && item.notes.trim() ? item.notes : undefined,
-    createdAt: item.createdAt,
+    createdAt,
     updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : undefined,
   };
 }
@@ -125,6 +133,8 @@ export function createMeasurement(input: MeasurementInput): Measurement {
   const measurement: Measurement = {
     ...input,
     id: createId(),
+    glucose: input.glucose ?? input.glucoseValue,
+    glucoseValue: input.glucoseValue,
     time: input.time || undefined,
     notes: input.notes?.trim() || undefined,
     createdAt: now,
@@ -142,6 +152,8 @@ export function updateMeasurement(id: string, input: MeasurementInput): Measurem
   const updated: Measurement = {
     ...existing,
     ...input,
+    glucose: input.glucose ?? input.glucoseValue,
+    glucoseValue: input.glucoseValue,
     time: input.time || undefined,
     notes: input.notes?.trim() || undefined,
     updatedAt: new Date().toISOString(),

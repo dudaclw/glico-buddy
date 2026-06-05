@@ -21,24 +21,33 @@ function NewMeasurement() {
     `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
   );
   const [glucose, setGlucose] = useState("");
-  const [period, setPeriod] = useState<PeriodId>("jejum");
+  const [period, setPeriod] = useState<PeriodId | "">("");
   const [insulinUnits, setInsulinUnits] = useState(0);
   const [notes, setNotes] = useState("");
   const [saved, setSaved] = useState(false);
+  const [attemptedSave, setAttemptedSave] = useState(false);
   const [farmFeedback, setFarmFeedback] = useState<FarmAdvanceResult | null>(null);
   const { createMeasurement } = useMeasurements();
 
   const glucoseValue = useMemo(() => Number(glucose), [glucose]);
-  const canSave =
-    Boolean(date) &&
-    Boolean(period) &&
-    Boolean(glucose) &&
-    Number.isFinite(glucoseValue) &&
-    glucoseValue > 0 &&
-    insulinUnits >= 0;
+  const validationErrors = useMemo(() => {
+    const errors: string[] = [];
+    if (!glucose) {
+      errors.push("Informe a glicemia em mg/dL.");
+    } else if (!Number.isFinite(glucoseValue) || glucoseValue <= 0) {
+      errors.push("Glicemia deve ser um número positivo.");
+    }
+    if (!period) errors.push("Escolha o período do dia.");
+    if (!date) errors.push("Informe a data da medição.");
+    if (insulinUnits < 0) errors.push("Unidades de insulina não podem ser negativas.");
+    return errors;
+  }, [date, glucose, glucoseValue, insulinUnits, period]);
+  const canSave = validationErrors.length === 0;
 
   function save() {
+    setAttemptedSave(true);
     if (!canSave) return;
+    if (!period) return;
     const measurementCountBeforeSave = getMeasurements().length;
     createMeasurement({
       date,
@@ -51,7 +60,9 @@ function NewMeasurement() {
     const farmResult = advanceFarmAfterMeasurement(measurementCountBeforeSave);
     setFarmFeedback(farmResult);
     setSaved(true);
+    setAttemptedSave(false);
     setGlucose("");
+    setPeriod("");
     setNotes("");
     window.setTimeout(() => {
       setSaved(false);
@@ -145,6 +156,17 @@ function NewMeasurement() {
         <PeriodSelector value={period} onChange={setPeriod} />
       </section>
 
+      {attemptedSave && validationErrors.length > 0 && (
+        <CozyCard className="border-[#e6a07b] bg-[#ffe4d2] p-3">
+          <p className="text-sm font-black text-[#8f3f28]">Revise antes de salvar</p>
+          <div className="mt-2 grid gap-1 text-sm font-bold text-[#7a442e]">
+            {validationErrors.map((error) => (
+              <p key={error}>{error}</p>
+            ))}
+          </div>
+        </CozyCard>
+      )}
+
       <CozyCard>
         <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-[#7c6242]">
           <Droplet className="h-5 w-5" />
@@ -175,8 +197,7 @@ function NewMeasurement() {
       <button
         type="button"
         onClick={save}
-        disabled={!canSave}
-        className="min-h-16 w-full rounded-[1.35rem] border-2 border-[#8b613b] bg-[#7CC576] px-5 text-lg font-black text-white shadow-cozy transition active:scale-[0.98] disabled:opacity-50"
+        className={`min-h-16 w-full rounded-[1.35rem] border-2 border-[#8b613b] bg-[#7CC576] px-5 text-lg font-black text-white shadow-cozy transition active:scale-[0.98] ${canSave ? "" : "opacity-70"}`}
       >
         Salvar Registro
       </button>
