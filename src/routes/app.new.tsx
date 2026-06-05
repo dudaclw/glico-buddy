@@ -2,7 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { CalendarDays, CheckCircle2, Clock3, Droplet, Leaf, NotebookPen } from "lucide-react";
 import { useMemo, useState } from "react";
 import { CozyCard, GlucoseStatusBadge, InsulinStepper, PeriodSelector } from "@/components/cozy";
+import { FarmFeedbackModal } from "@/components/farm";
 import { useMeasurements } from "@/hooks/useMeasurements";
+import { advanceFarmAfterMeasurement } from "@/services/farm";
+import { getMeasurements } from "@/services/measurements";
+import type { FarmAdvanceResult } from "@/types/farm";
 import type { PeriodId } from "@/types/measurement";
 import { formatDateKey } from "@/utils/measurementCalculations";
 
@@ -21,6 +25,7 @@ function NewMeasurement() {
   const [insulinUnits, setInsulinUnits] = useState(0);
   const [notes, setNotes] = useState("");
   const [saved, setSaved] = useState(false);
+  const [farmFeedback, setFarmFeedback] = useState<FarmAdvanceResult | null>(null);
   const { createMeasurement } = useMeasurements();
 
   const glucoseValue = useMemo(() => Number(glucose), [glucose]);
@@ -34,6 +39,7 @@ function NewMeasurement() {
 
   function save() {
     if (!canSave) return;
+    const measurementCountBeforeSave = getMeasurements().length;
     createMeasurement({
       date,
       time,
@@ -42,10 +48,15 @@ function NewMeasurement() {
       insulinUnits,
       notes,
     });
+    const farmResult = advanceFarmAfterMeasurement(measurementCountBeforeSave);
+    setFarmFeedback(farmResult);
     setSaved(true);
     setGlucose("");
     setNotes("");
-    window.setTimeout(() => setSaved(false), 2200);
+    window.setTimeout(() => {
+      setSaved(false);
+      setFarmFeedback(null);
+    }, 2000);
   }
 
   return (
@@ -67,6 +78,8 @@ function NewMeasurement() {
           </div>
         </div>
       )}
+
+      {farmFeedback && <FarmFeedbackModal result={farmFeedback} />}
 
       <CozyCard className="p-5">
         <label className="text-xs font-black uppercase tracking-wide text-[#7c6242]">

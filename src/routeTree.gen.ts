@@ -17,6 +17,7 @@ import { Route as AppReportsRouteImport } from './routes/app.reports'
 import { Route as AppProfileRouteImport } from './routes/app.profile'
 import { Route as AppNewRouteImport } from './routes/app.new'
 import { Route as AppHistoryRouteImport } from './routes/app.history'
+import { Route as AppFarmRouteImport } from './routes/app.farm'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -58,11 +59,17 @@ const AppHistoryRoute = AppHistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => AppRoute,
 } as any)
+const AppFarmRoute = AppFarmRouteImport.update({
+  id: '/farm',
+  path: '/farm',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/farm': typeof AppFarmRoute
   '/app/history': typeof AppHistoryRoute
   '/app/new': typeof AppNewRoute
   '/app/profile': typeof AppProfileRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/app/farm': typeof AppFarmRoute
   '/app/history': typeof AppHistoryRoute
   '/app/new': typeof AppNewRoute
   '/app/profile': typeof AppProfileRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/farm': typeof AppFarmRoute
   '/app/history': typeof AppHistoryRoute
   '/app/new': typeof AppNewRoute
   '/app/profile': typeof AppProfileRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/login'
+    | '/app/farm'
     | '/app/history'
     | '/app/new'
     | '/app/profile'
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/app/farm'
     | '/app/history'
     | '/app/new'
     | '/app/profile'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/login'
+    | '/app/farm'
     | '/app/history'
     | '/app/new'
     | '/app/profile'
@@ -185,10 +197,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppHistoryRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/farm': {
+      id: '/app/farm'
+      path: '/farm'
+      fullPath: '/app/farm'
+      preLoaderRoute: typeof AppFarmRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppFarmRoute: typeof AppFarmRoute
   AppHistoryRoute: typeof AppHistoryRoute
   AppNewRoute: typeof AppNewRoute
   AppProfileRoute: typeof AppProfileRoute
@@ -197,6 +217,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppFarmRoute: AppFarmRoute,
   AppHistoryRoute: AppHistoryRoute,
   AppNewRoute: AppNewRoute,
   AppProfileRoute: AppProfileRoute,

@@ -7,6 +7,8 @@ import {
   ProgressQuestBar,
   StatCard,
 } from "@/components/cozy";
+import { FarmDashboardCard } from "@/components/farm";
+import { useFarm } from "@/hooks/useFarm";
 import { useMeasurements } from "@/hooks/useMeasurements";
 import { periods } from "@/types/measurement";
 import { getMeasurementSummary, getTodayKey } from "@/utils/measurementCalculations";
@@ -17,6 +19,7 @@ export const Route = createFileRoute("/app/")({
 
 function Dashboard() {
   const { measurements } = useMeasurements();
+  const { farm } = useFarm();
   const summary = getMeasurementSummary(measurements);
   const questGoal = 4;
   const remainingToday = Math.max(0, questGoal - summary.todayCount);
@@ -89,6 +92,8 @@ function Dashboard() {
       </div>
 
       <ProgressQuestBar current={summary.todayCount} total={questGoal} />
+
+      <FarmDashboardCard farm={farm} />
 
       <Link
         to="/app/new"
