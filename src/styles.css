@@ -44,7 +44,7 @@
 }
 
 :root {
-  color-scheme: light;
+  color-scheme: only light;
   --radius: 1.2rem;
   --app-body-bg: #fff7e6;
   --app-foreground: #4b352a;
@@ -89,7 +89,7 @@
 }
 
 html.light {
-  color-scheme: light;
+  color-scheme: only light;
 }
 
 html.dark {
@@ -120,6 +120,7 @@ html.dark {
 html.light body {
   background-color: #fff7e6;
   color: #4b352a;
+  color-scheme: only light;
 }
 
 html.dark body {

@@ -13,6 +13,30 @@ import appCss from "../styles.css?url";
 import { Toaster } from "../components/ui/sonner";
 import { useTheme } from "@/hooks/useTheme";
 
+const THEME_INIT_SCRIPT = `
+(() => {
+  const root = document.documentElement;
+  let theme = "light";
+
+  try {
+    theme = localStorage.getItem("theme") === "dark" ? "dark" : "light";
+    localStorage.setItem("theme", theme);
+  } catch {}
+
+  root.classList.remove("light", "dark");
+  root.classList.add(theme);
+  root.style.colorScheme = theme === "dark" ? "dark" : "only light";
+
+  const colorScheme = document.querySelector('meta[name="color-scheme"]');
+  const supportedSchemes = document.querySelector('meta[name="supported-color-schemes"]');
+  const themeColor = document.querySelector('meta[name="theme-color"]');
+
+  if (colorScheme) colorScheme.content = theme === "dark" ? "dark" : "only light";
+  if (supportedSchemes) supportedSchemes.content = theme === "dark" ? "dark" : "light";
+  if (themeColor) themeColor.content = theme === "dark" ? "#1E1B16" : "#8CCAF7";
+})();
+`;
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -60,6 +84,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+      { name: "color-scheme", content: "only light" },
+      { name: "supported-color-schemes", content: "light" },
       { name: "theme-color", content: "#8CCAF7" },
       { title: "dailyglico — diário glicêmico cozy" },
       {
@@ -89,11 +115,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="pt-BR" className="light">
+    <html lang="pt-BR" className="light" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body className="light">
+      <body className="light" suppressHydrationWarning>
         {children}
         <Scripts />
       </body>
