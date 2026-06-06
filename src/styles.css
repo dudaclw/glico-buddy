@@ -44,9 +44,10 @@
 }
 
 :root {
+  color-scheme: light;
   --radius: 1.2rem;
   --app-body-bg: #fff7e6;
-  --app-foreground: #4a3828;
+  --app-foreground: #4b352a;
   --app-sky: #8ccaf7;
   --app-ground: #dff3c8;
   --app-sky-pixel-x: rgba(255, 255, 255, 0.34);
@@ -57,11 +58,11 @@
   --app-shadow-line: #8b613b;
   --app-shadow-glow: rgba(95, 63, 35, 0.16);
   --background: #fff7e6;
-  --foreground: #4a3828;
+  --foreground: #4b352a;
   --card: #fff7e6;
-  --card-foreground: #4a3828;
+  --card-foreground: #4b352a;
   --popover: #fff7e6;
-  --popover-foreground: #4a3828;
+  --popover-foreground: #4b352a;
   --primary: #7cc576;
   --primary-foreground: #ffffff;
   --primary-glow: #b8e986;
@@ -87,12 +88,16 @@
   --chart-5: #a67c52;
 }
 
-html[data-app-theme="dark"] {
+html.light {
+  color-scheme: light;
+}
+
+html.dark {
   color-scheme: dark;
-  --app-body-bg: #1d2630;
-  --app-foreground: #f8ead2;
-  --app-sky: #203a55;
-  --app-ground: #253d31;
+  --app-body-bg: #1e1b16;
+  --app-foreground: #fff7e6;
+  --app-sky: #2c3843;
+  --app-ground: #282e23;
   --app-sky-pixel-x: rgba(255, 255, 255, 0.11);
   --app-sky-pixel-y: rgba(255, 255, 255, 0.08);
   --app-input-bg: #2a3340;
@@ -100,16 +105,26 @@ html[data-app-theme="dark"] {
   --app-input-focus: #b8e986;
   --app-shadow-line: #121821;
   --app-shadow-glow: rgba(0, 0, 0, 0.38);
-  --background: #1d2630;
-  --foreground: #f8ead2;
-  --card: #283341;
-  --card-foreground: #f8ead2;
-  --popover: #283341;
-  --popover-foreground: #f8ead2;
+  --background: #1e1b16;
+  --foreground: #fff7e6;
+  --card: #28231d;
+  --card-foreground: #fff7e6;
+  --popover: #28231d;
+  --popover-foreground: #fff7e6;
   --muted: #394353;
   --muted-foreground: #d9c9ad;
   --border: #6c7e74;
   --input: #2a3340;
+}
+
+html.light body {
+  background-color: #fff7e6;
+  color: #4b352a;
+}
+
+html.dark body {
+  background-color: #1e1b16;
+  color: #fff7e6;
 }
 
 @layer base {
@@ -219,19 +234,19 @@ html[data-app-theme="dark"] {
   }
 }
 
-html[data-app-theme="dark"] .pixel-frame {
+html.dark .pixel-frame {
   background-color: var(--card);
   color: var(--card-foreground);
 }
 
-html[data-app-theme="dark"] nav {
+html.dark nav {
   border-color: #344858;
   background: rgba(31, 40, 51, 0.96);
   box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.28);
 }
 
-html[data-app-theme="dark"] input::placeholder,
-html[data-app-theme="dark"] textarea::placeholder {
+html.dark input::placeholder,
+html.dark textarea::placeholder {
   color: #a99b88;
 }
 
