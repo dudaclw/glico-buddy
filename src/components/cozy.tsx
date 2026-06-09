@@ -91,22 +91,25 @@ export function PixelMascot({ className }: { className?: string }) {
         "pixel-mascot relative grid h-24 w-20 grid-cols-5 grid-rows-7 gap-1",
         className,
       )}
-      aria-label="Mascote gotinha pixelada"
+      aria-label="Mascote gatinho pixelado"
       role="img"
     >
       {Array.from({ length: 35 }).map((_, index) => {
         const visible = [
-          2, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26, 27, 28,
+          0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26, 27,
+          28, 29, 31, 32, 33, 34,
         ].includes(index);
-        const shine = [7, 11].includes(index);
+        const innerEar = [5, 9].includes(index);
+        const muzzleOrPaw = [21, 23, 31, 33].includes(index);
         const face = [16, 18, 22].includes(index);
         return (
           <span
             key={index}
             className={cn(
               "rounded-[3px]",
-              visible ? "bg-[#ff9aa0]" : "bg-transparent",
-              shine && "bg-[#ffd5c6]",
+              visible ? "bg-[#ffc48c]" : "bg-transparent",
+              innerEar && "bg-[#ff9aa0]",
+              muzzleOrPaw && "bg-[#fff1d6]",
               face && "bg-[#5b2f2a]",
             )}
           />

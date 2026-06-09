@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Activity, CalendarCheck2, ChevronRight, Clock3, TrendingUp } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
   CozyCard,
   GlucoseStatusBadge,
@@ -17,9 +18,18 @@ export const Route = createFileRoute("/app/")({
   component: Dashboard,
 });
 
+function getGreeting() {
+  const hour = new Date().getHours();
+
+  if (hour < 12) return "Bom dia";
+  if (hour < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 function Dashboard() {
   const { measurements } = useMeasurements();
   const { farm } = useFarm();
+  const [greeting, setGreeting] = useState("Olá");
   const summary = getMeasurementSummary(measurements);
   const questGoal = 4;
   const remainingToday = Math.max(0, questGoal - summary.todayCount);
@@ -28,11 +38,20 @@ function Dashboard() {
   );
   const nextMissions = periods.filter((period) => !completedPeriods.has(period.id)).slice(0, 3);
 
+  useEffect(() => {
+    const updateGreeting = () => setGreeting(getGreeting());
+
+    updateGreeting();
+    const intervalId = window.setInterval(updateGreeting, 60_000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   return (
     <div className="space-y-4">
       <header className="flex items-center justify-between gap-4 pt-2">
         <div>
-          <p className="text-sm font-black uppercase tracking-wide text-[#5e8e57]">Bom dia</p>
+          <p className="text-sm font-black uppercase tracking-wide text-[#5e8e57]">{greeting}</p>
           <h1 className="mt-1 text-3xl font-black leading-tight text-[#4a3828]">
             Fazenda glicêmica
           </h1>
