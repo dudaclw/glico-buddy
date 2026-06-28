@@ -1,5 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Cat, Sparkles } from "lucide-react";
+import brotinhoImage from "../../brotinho.png";
+import canteiroImage from "@/canteiro.png";
 import { CozyCard } from "@/components/cozy";
 import { cn } from "@/lib/utils";
 import {
@@ -21,49 +23,76 @@ export function FarmScene({
   farm,
   compact = false,
   highlightCurrent = false,
+  className,
 }: {
   farm: Farm;
   compact?: boolean;
   highlightCurrent?: boolean;
+  className?: string;
 }) {
   const plots = getFarmPlots(farm);
 
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl border-2 border-[#6aa85c] bg-[#bfe8a5] p-3 shadow-tile",
-        compact ? "min-h-36" : "min-h-64",
+        "mx-auto grid w-full grid-cols-[repeat(5,minmax(0,1fr))] items-center overflow-visible",
+        compact
+          ? "min-h-[clamp(3.25rem,16vw,5rem)] max-w-[18rem] gap-[clamp(0.0625rem,0.8vw,0.25rem)]"
+          : "min-h-[clamp(3.75rem,18vw,6rem)] max-w-[24rem] gap-[clamp(0.0625rem,1vw,0.375rem)]",
+        className,
+      )}
+      aria-label="Canteiros da Fazenda da Saúde"
+      role="img"
+    >
+      {plots.map((plot, index) => (
+        <div
+          key={`${plot?.id ?? "empty"}-${index}`}
+          className={cn(
+            "relative grid aspect-square min-w-0 place-items-center overflow-visible",
+            highlightCurrent && index === 0 && "animate-grow-pop",
+          )}
+        >
+          <img
+            src={canteiroImage}
+            alt=""
+            className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain pixel-mascot"
+            draggable={false}
+          />
+          {plot && <PlantPlotVisual plot={plot} compact={compact} />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PlantPlotVisual({ plot, compact }: { plot: Plant; compact: boolean }) {
+  const plantIcon = getPlantStageIcon(plot);
+
+  if (plantIcon === "🌰") {
+    return (
+      <img
+        src={brotinhoImage}
+        alt=""
+        aria-hidden
+        className={cn(
+          "relative z-10 -mt-1 w-[clamp(1.25rem,6vw,1.875rem)] select-none object-contain drop-shadow-[0_3px_0_rgba(95,63,35,0.25)] pixel-mascot",
+          compact && "w-[clamp(1.125rem,5vw,1.5rem)]",
+        )}
+        draggable={false}
+      />
+    );
+  }
+
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "relative z-10 -mt-1 text-[clamp(1.5rem,8vw,1.875rem)] leading-none drop-shadow-[0_3px_0_rgba(95,63,35,0.25)]",
+        compact && "text-[clamp(1.25rem,7vw,1.5rem)]",
       )}
     >
-      <div className="absolute inset-x-0 top-0 h-16 bg-[#a7d8ff]" />
-      <div className="absolute left-4 top-7 grid h-16 w-20 place-items-end rounded-t-2xl border-2 border-[#8b613b] bg-[#fff7e6] shadow-tile">
-        <div className="absolute -top-5 left-2 h-8 w-16 rotate-[-4deg] rounded-t-xl border-2 border-[#8b613b] bg-[#d58661]" />
-        <div className="mb-1 h-8 w-6 rounded-t-lg border-2 border-[#8b613b] bg-[#a67c52]" />
-        <div className="absolute right-3 top-5 h-5 w-5 border-2 border-[#8b613b] bg-[#f7d66b]" />
-      </div>
-
-      <div className={cn("relative z-10 grid grid-cols-5 gap-2", compact ? "mt-24" : "mt-32")}>
-        {plots.map((plot, index) => (
-          <div
-            key={`${plot?.id ?? "empty"}-${index}`}
-            className={cn(
-              "grid aspect-square place-items-center rounded-xl border-2 border-[#8b613b] bg-[#a67c52] text-2xl shadow-tile",
-              !plot && "bg-[#c99b66]",
-              highlightCurrent && index === 0 && "animate-grow-pop",
-            )}
-          >
-            <span aria-hidden>{plot ? getPlantStageIcon(plot) : ""}</span>
-          </div>
-        ))}
-      </div>
-
-      {!compact && (
-        <div className="relative z-10 mt-4 flex items-center justify-between rounded-2xl border-2 border-[#77b866] bg-[#dff3c8] px-3 py-2 text-xs font-black text-[#426931]">
-          <span>Gramado cuidado</span>
-          <span>5 canteiros</span>
-        </div>
-      )}
-    </div>
+      {plantIcon}
+    </span>
   );
 }
 
@@ -175,7 +204,13 @@ export function FarmUnlockList({ farm }: { farm: Farm }) {
   );
 }
 
-export function FarmFeedbackModal({ result }: { result: FarmAdvanceResult }) {
+export function FarmFeedbackModal({
+  result,
+  rewardAmount,
+}: {
+  result: FarmAdvanceResult;
+  rewardAmount?: number;
+}) {
   const hasHarvest = Boolean(result.harvestedPlant);
   const unlockedPlant = result.unlockedPlants[0]
     ? getPlantDefinition(result.unlockedPlants[0])
@@ -198,6 +233,11 @@ export function FarmFeedbackModal({ result }: { result: FarmAdvanceResult }) {
         <p className="mt-1 text-sm font-bold text-[#7c6242]">
           {hasHarvest ? "Uma nova semente foi plantada." : "Sua plantinha cresceu."}
         </p>
+        {rewardAmount ? (
+          <p className="mt-3 rounded-2xl bg-[#F7D66B] px-3 py-2 text-sm font-black text-[#5f3f23]">
+            Você ganhou +{rewardAmount} ATP.
+          </p>
+        ) : null}
         {unlockedPlant && (
           <p className="mt-3 rounded-2xl bg-[#dff3c8] px-3 py-2 text-sm font-black text-[#375629]">
             {unlockedPlant.icon} {unlockedPlant.label} desbloqueada

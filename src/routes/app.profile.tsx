@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Bell, Brush, ChevronRight, Moon, Palette, ShieldCheck, UserRound } from "lucide-react";
 import { useState } from "react";
 import { CozyCard, PixelMascot } from "@/components/cozy";
+import { useProfile } from "@/hooks/useProfile";
 import { useTheme } from "@/hooks/useTheme";
+import { DEFAULT_FARM_NAME } from "@/services/profile";
 
 export const Route = createFileRoute("/app/profile")({
   component: Profile,
@@ -15,6 +17,7 @@ function Profile() {
   const [targetMax, setTargetMax] = useState("180");
   const [cozyMode, setCozyMode] = useState(true);
   const [reminders, setReminders] = useState(true);
+  const { profile, setProfile } = useProfile();
   const { theme, setTheme } = useTheme();
 
   return (
@@ -45,6 +48,19 @@ function Profile() {
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="Seu nome"
+              className="cozy-input"
+            />
+          </Field>
+          <Field label="Nome da fazenda">
+            <input
+              value={profile.farmName === DEFAULT_FARM_NAME ? "" : profile.farmName}
+              onChange={(event) =>
+                setProfile({
+                  ...profile,
+                  farmName: event.target.value,
+                })
+              }
+              placeholder={DEFAULT_FARM_NAME}
               className="cozy-input"
             />
           </Field>

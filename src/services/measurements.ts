@@ -1,7 +1,13 @@
 import type { Measurement, MeasurementInput, PeriodId } from "@/types/measurement";
+import { addCareDrops, calculateGlucoseRecordReward } from "@/services/rewards";
 
 export const STORAGE_KEY = "glicotrack_measurements";
 export const MEASUREMENTS_CHANGED_EVENT = "glicotrack_measurements_changed";
+
+export type MeasurementCreateResult = {
+  measurement: Measurement;
+  rewardAmount: number;
+};
 
 const periodIds: PeriodId[] = [
   "jejum",
@@ -74,6 +80,7 @@ function normalizeMeasurement(value: unknown): Measurement | null {
     glucoseValue,
     insulinUnits,
     notes: typeof item.notes === "string" && item.notes.trim() ? item.notes : undefined,
+    rewardGranted: item.rewardGranted === true,
     createdAt,
     updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : undefined,
   };
@@ -128,7 +135,7 @@ function saveMeasurements(measurements: Measurement[]) {
   notifyMeasurementsChanged();
 }
 
-export function createMeasurement(input: MeasurementInput): Measurement {
+export function createMeasurement(input: MeasurementInput): MeasurementCreateResult {
   const now = new Date().toISOString();
   const measurement: Measurement = {
     ...input,
@@ -137,11 +144,25 @@ export function createMeasurement(input: MeasurementInput): Measurement {
     glucoseValue: input.glucoseValue,
     time: input.time || undefined,
     notes: input.notes?.trim() || undefined,
+    rewardGranted: false,
     createdAt: now,
   };
+  const existingMeasurements = getMeasurements();
+  const nextMeasurements = [measurement, ...existingMeasurements];
+  const recordsOfTheDay = nextMeasurements.filter((item) => item.date === measurement.date);
+  const rewardAmount = calculateGlucoseRecordReward(measurement, recordsOfTheDay);
+  const rewardedMeasurement = {
+    ...measurement,
+    rewardGranted: true,
+  };
 
-  saveMeasurements([measurement, ...getMeasurements()]);
-  return measurement;
+  saveMeasurements([rewardedMeasurement, ...existingMeasurements]);
+  addCareDrops(rewardAmount);
+
+  return {
+    measurement: rewardedMeasurement,
+    rewardAmount,
+  };
 }
 
 export function updateMeasurement(id: string, input: MeasurementInput): Measurement | null {

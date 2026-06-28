@@ -21,13 +21,14 @@ export type Measurement = {
   glucoseValue: number;
   insulinUnits?: number;
   notes?: string;
+  rewardGranted: boolean;
   createdAt: string;
   updatedAt?: string;
 };
 
 export type MeasurementInput = Omit<
   Measurement,
-  "id" | "createdAt" | "updatedAt" | "glucose"
+  "id" | "createdAt" | "updatedAt" | "glucose" | "rewardGranted"
 > & {
   glucose?: number;
 };

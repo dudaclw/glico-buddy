@@ -9,7 +9,7 @@ import {
   PeriodSelector,
 } from "@/components/cozy";
 import { useMeasurements } from "@/hooks/useMeasurements";
-import type { Measurement, PeriodId } from "@/types/measurement";
+import type { Measurement, MeasurementInput, PeriodId } from "@/types/measurement";
 import { getMonthKey, groupMeasurementsByDate } from "@/utils/measurementCalculations";
 
 export const Route = createFileRoute("/app/history")({
@@ -125,7 +125,7 @@ function EditMeasurementCard({
 }: {
   measurement: Measurement;
   onCancel: () => void;
-  onSave: (measurement: Omit<Measurement, "id" | "createdAt" | "updatedAt">) => void;
+  onSave: (measurement: MeasurementInput) => void;
 }) {
   const [date, setDate] = useState(measurement.date);
   const [time, setTime] = useState(measurement.time ?? "");

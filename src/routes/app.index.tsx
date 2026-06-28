@@ -11,6 +11,7 @@ import {
 import { FarmDashboardCard } from "@/components/farm";
 import { useFarm } from "@/hooks/useFarm";
 import { useMeasurements } from "@/hooks/useMeasurements";
+import { useRewards } from "@/hooks/useRewards";
 import { periods } from "@/types/measurement";
 import { getMeasurementSummary, getTodayKey } from "@/utils/measurementCalculations";
 
@@ -29,6 +30,7 @@ function getGreeting() {
 function Dashboard() {
   const { measurements } = useMeasurements();
   const { farm } = useFarm();
+  const { rewards } = useRewards();
   const [greeting, setGreeting] = useState("Olá");
   const summary = getMeasurementSummary(measurements);
   const questGoal = 4;
@@ -56,6 +58,9 @@ function Dashboard() {
             Fazenda glicêmica
           </h1>
           <p className="mt-1 text-sm font-bold text-[#7c6242]">Sua rotina em clima de jogo cozy.</p>
+          <p className="mt-3 inline-flex rounded-2xl border-2 border-[#8b613b] bg-[#F7D66B] px-3 py-1 text-sm font-black text-[#5f3f23] shadow-tile">
+            ATP: {rewards.careDrops}
+          </p>
         </div>
         <PixelMascot className="shrink-0 animate-bounce-soft" />
       </header>

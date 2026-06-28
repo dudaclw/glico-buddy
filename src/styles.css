@@ -173,8 +173,15 @@ html.dark body {
   .bg-farm {
     background:
       linear-gradient(180deg, var(--app-sky) 0 28%, transparent 28%),
-      linear-gradient(180deg, transparent 0 64%, var(--app-ground) 64% 100%),
-      var(--app-body-bg);
+      linear-gradient(180deg, transparent 0 64%, var(--app-ground) 64% 100%), var(--app-body-bg);
+  }
+
+  .bg-farm-background {
+    background-image: url("/farm-background.png");
+    background-position: top center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    image-rendering: pixelated;
   }
 
   .bg-sky-pixels {

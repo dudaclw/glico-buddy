@@ -25,6 +25,7 @@ function NewMeasurement() {
   const [insulinUnits, setInsulinUnits] = useState(0);
   const [notes, setNotes] = useState("");
   const [saved, setSaved] = useState(false);
+  const [savedReward, setSavedReward] = useState(0);
   const [attemptedSave, setAttemptedSave] = useState(false);
   const [farmFeedback, setFarmFeedback] = useState<FarmAdvanceResult | null>(null);
   const { createMeasurement } = useMeasurements();
@@ -49,7 +50,7 @@ function NewMeasurement() {
     if (!canSave) return;
     if (!period) return;
     const measurementCountBeforeSave = getMeasurements().length;
-    createMeasurement({
+    const result = createMeasurement({
       date,
       time,
       period,
@@ -59,6 +60,7 @@ function NewMeasurement() {
     });
     const farmResult = advanceFarmAfterMeasurement(measurementCountBeforeSave);
     setFarmFeedback(farmResult);
+    setSavedReward(result.rewardAmount);
     setSaved(true);
     setAttemptedSave(false);
     setGlucose("");
@@ -66,6 +68,7 @@ function NewMeasurement() {
     setNotes("");
     window.setTimeout(() => {
       setSaved(false);
+      setSavedReward(0);
       setFarmFeedback(null);
     }, 2000);
   }
@@ -85,12 +88,12 @@ function NewMeasurement() {
           <CheckCircle2 className="h-6 w-6" />
           <div>
             <p className="text-sm font-black">Registro salvo no diário</p>
-            <p className="text-xs font-bold">A missão avançou mais um passo.</p>
+            <p className="text-xs font-bold">Você ganhou +{savedReward} ATP.</p>
           </div>
         </div>
       )}
 
-      {farmFeedback && <FarmFeedbackModal result={farmFeedback} />}
+      {farmFeedback && <FarmFeedbackModal result={farmFeedback} rewardAmount={savedReward} />}
 
       <CozyCard className="p-5">
         <label className="text-xs font-black uppercase tracking-wide text-[#7c6242]">
