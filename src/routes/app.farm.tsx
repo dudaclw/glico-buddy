@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronRight, PackageCheck, ShoppingBasket, X } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, ChevronRight, PackageCheck, ShoppingBasket, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import gatoImage from "../../gato.png";
 import { CozyCard } from "@/components/cozy";
 import { FarmScene } from "@/components/farm";
@@ -8,22 +8,37 @@ import { useFarm } from "@/hooks/useFarm";
 import { useFarmShop } from "@/hooks/useFarmShop";
 import { useProfile } from "@/hooks/useProfile";
 import { useRewards } from "@/hooks/useRewards";
-import { farmShopItems, getFarmShopItem } from "@/services/farmShop";
-import { getPlantDefinition } from "@/types/farm";
+import { plantSeedOnPlot } from "@/services/farm";
+import { farmShopItems, getFarmShopItem, type FarmInventoryItem } from "@/services/farmShop";
+import { FARM_STAGE_LABELS, getFarmPlantIcon, type Farm, type FarmPlot } from "@/types/farm";
 
 export const Route = createFileRoute("/app/farm")({
   component: FarmPage,
 });
 
 function FarmPage() {
-  const { farm } = useFarm();
-  const { inventory, buyItem } = useFarmShop();
+  const { farm, refreshFarm } = useFarm();
+  const { inventory, buyItem, refreshInventory } = useFarmShop();
   const { profile } = useProfile();
   const { rewards } = useRewards();
   const [shopOpen, setShopOpen] = useState(false);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
   const [shopMessage, setShopMessage] = useState("");
   const [shopMessageType, setShopMessageType] = useState<"success" | "error">("success");
-  const currentPlant = getPlantDefinition(farm.currentPlant.type);
+  const [farmMessage, setFarmMessage] = useState("");
+  const [farmMessageType, setFarmMessageType] = useState<"success" | "error">("success");
+  const [plotsOpen, setPlotsOpen] = useState(true);
+  const seedInventory = inventory.filter((item) => item.type === "seed");
+
+  useEffect(() => {
+    if (!shopMessage) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setShopMessage("");
+    }, 3000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [shopMessage]);
 
   function buyShopItem(itemId: string) {
     const result = buyItem(itemId);
@@ -34,6 +49,14 @@ function FarmPage() {
   function openShop() {
     setShopOpen(true);
     setShopMessage("");
+  }
+
+  function plantSeed(seedItemId: string, plotId: string) {
+    const result = plantSeedOnPlot(seedItemId, plotId);
+    setFarmMessage(result.message);
+    setFarmMessageType(result.success ? "success" : "error");
+    refreshFarm();
+    refreshInventory();
   }
 
   return (
@@ -47,7 +70,7 @@ function FarmPage() {
           draggable={false}
         />
       </div>
-      <div className="pointer-events-none fixed inset-x-0 top-[clamp(18rem,43vh,21rem)] z-20 px-4">
+      <div className="pointer-events-none fixed inset-x-0 top-[clamp(20rem,48vh,24rem)] z-20 px-4">
         <div className="mx-auto max-w-md">
           <FarmScene farm={farm} highlightCurrent />
         </div>
@@ -70,32 +93,71 @@ function FarmPage() {
       >
         <ShoppingBasket className="h-6 w-6" strokeWidth={3} />
       </button>
+      <button
+        type="button"
+        onClick={() => setInventoryOpen(true)}
+        className="fixed left-4 top-4 z-40 grid h-12 w-12 place-items-center rounded-2xl border-2 border-[#8b613b] bg-[#F7D66B] text-[#5f3f23] shadow-cozy active:scale-95"
+        aria-label="Abrir inventário da fazenda"
+      >
+        <PackageCheck className="h-6 w-6" strokeWidth={3} />
+      </button>
 
-      <div className="relative z-10 space-y-4 pb-44 pt-2">
-        <div aria-hidden="true" className="h-[clamp(19rem,48vh,24rem)]" />
+      <div className="fixed inset-x-0 bottom-[calc(10.5rem+env(safe-area-inset-bottom))] top-[calc(clamp(20rem,48vh,24rem)+clamp(3.75rem,18vw,6rem)+0.75rem)] z-10 overflow-y-auto overscroll-contain px-4 pb-4">
+        <div className="mx-auto max-w-md space-y-4">
+          {farmMessage && (
+            <p
+              className={`rounded-2xl border-2 px-3 py-2 text-sm font-black shadow-tile ${
+                farmMessageType === "success"
+                  ? "border-[#82cf67] bg-[#dff3c8] text-[#375629]"
+                  : "border-[#dcbf8b] bg-[#ffe4d2] text-[#8f3f28]"
+              }`}
+            >
+              {farmMessage}
+            </p>
+          )}
 
-        <CozyCard>
-          <div className="mb-3 flex items-center gap-2">
-            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#F7D66B] text-xl">
-              {currentPlant.icon}
-            </span>
-            <div>
-              <h2 className="text-base font-black text-[#4a3828]">{currentPlant.label}</h2>
-              <p className="text-xs font-bold text-[#8a6b45]">
-                {farm.currentPlant.growthStage}/{farm.currentPlant.maxStage} registros até a
-                colheita
-              </p>
-            </div>
-          </div>
-          <div className="h-5 rounded-full border-2 border-[#6aa85c] bg-[#fff7df] p-0.5">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-[#7CC576] to-[#F7D66B] transition-all"
-              style={{
-                width: `${(farm.currentPlant.growthStage / farm.currentPlant.maxStage) * 100}%`,
-              }}
-            />
-          </div>
-        </CozyCard>
+          <CozyCard className="grid gap-3">
+            <button
+              type="button"
+              onClick={() => setPlotsOpen((current) => !current)}
+              aria-expanded={plotsOpen}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl text-left active:scale-[0.99]"
+            >
+              <span className="min-w-0">
+                <span className="block text-base font-black text-[#4a3828]">Canteiros</span>
+                <span className="block text-xs font-bold text-[#8a6b45]">
+                  {farm.plants.length} planta{farm.plants.length === 1 ? "" : "s"} na fazendinha
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                <span className="rounded-2xl bg-[#F7D66B] px-3 py-1 text-xs font-black text-[#5f3f23] shadow-tile">
+                  {seedInventory.reduce((total, item) => total + item.quantity, 0)} sementes
+                </span>
+                <span className="grid h-10 w-10 place-items-center rounded-2xl border-2 border-[#8b613b] bg-[#fff7e6] text-[#5f3f23] shadow-tile">
+                  <ChevronDown
+                    className={`h-5 w-5 transition-transform ${plotsOpen ? "rotate-180" : ""}`}
+                    strokeWidth={3}
+                  />
+                </span>
+              </span>
+            </button>
+
+            {plotsOpen && (
+              <div className="grid gap-2">
+                {farm.plots.map((plot, index) => (
+                  <FarmPlotRow
+                    key={plot.id}
+                    plot={plot}
+                    plotNumber={index + 1}
+                    farm={farm}
+                    seedInventory={seedInventory}
+                    onPlant={plantSeed}
+                  />
+                ))}
+              </div>
+            )}
+          </CozyCard>
+        </div>
       </div>
 
       <div className="fixed inset-x-0 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-30 px-4">
@@ -165,34 +227,139 @@ function FarmPage() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
 
-            <div className="mt-4 rounded-2xl border-2 border-[#b6d795] bg-[#dff3c8] p-3">
-              <div className="mb-3 flex items-center gap-2">
-                <PackageCheck className="h-5 w-5 text-[#5e8e57]" />
-                <h3 className="text-base font-black text-[#375629]">Inventário</h3>
+      {inventoryOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#4a3828]/30 px-3 pb-3 pt-10 backdrop-blur-sm">
+          <div className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-[1.5rem] border-2 border-[#8b613b] bg-[#FFF7E6] p-4 shadow-cozy">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-black text-[#4a3828]">Inventário</h2>
+                <p className="mt-1 text-sm font-bold text-[#7c6242]">
+                  {inventory.length} item{inventory.length === 1 ? "" : "s"} guardado
+                  {inventory.length === 1 ? "" : "s"}.
+                </p>
               </div>
-              {inventory.length === 0 ? (
-                <p className="text-sm font-bold text-[#547d37]">Nenhuma semente comprada ainda.</p>
-              ) : (
-                <div className="grid gap-2">
-                  {inventory.map((item) => {
-                    const shopItem = getFarmShopItem(item.itemId);
-                    return (
-                      <div
-                        key={item.itemId}
-                        className="flex items-center justify-between rounded-2xl bg-[#fffdf4] px-3 py-2 text-sm font-black text-[#4a3828] shadow-tile"
-                      >
-                        <span>{shopItem?.name ?? item.itemId}</span>
-                        <span>x{item.quantity}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => setInventoryOpen(false)}
+                aria-label="Fechar inventário"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border-2 border-[#8b613b] bg-[#F7D66B] text-[#5f3f23] shadow-tile active:scale-95"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
+
+            {inventory.length === 0 ? (
+              <p className="rounded-2xl border-2 border-[#dcbf8b] bg-[#fffdf4] px-3 py-3 text-sm font-black text-[#7c6242] shadow-tile">
+                Nenhuma semente comprada ainda.
+              </p>
+            ) : (
+              <div className="grid gap-2">
+                {inventory.map((item) => {
+                  const shopItem = getFarmShopItem(item.itemId);
+                  return (
+                    <div
+                      key={item.itemId}
+                      className="flex items-center justify-between rounded-2xl border-2 border-[#dcbf8b] bg-[#fffdf4] px-3 py-3 text-sm font-black text-[#4a3828] shadow-tile"
+                    >
+                      <span>{shopItem?.name ?? item.itemId}</span>
+                      <span>x{item.quantity}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
     </>
+  );
+}
+
+function FarmPlotRow({
+  plot,
+  plotNumber,
+  farm,
+  seedInventory,
+  onPlant,
+}: {
+  plot: FarmPlot;
+  plotNumber: number;
+  farm: Farm;
+  seedInventory: FarmInventoryItem[];
+  onPlant: (seedItemId: string, plotId: string) => void;
+}) {
+  const plant = plot.plantId
+    ? farm.plants.find((candidate) => candidate.id === plot.plantId) ?? null
+    : null;
+
+  return (
+    <div className="rounded-2xl border-2 border-[#dcbf8b] bg-[#fffdf4] p-3 shadow-tile">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-black text-[#4a3828]">Canteiro {plotNumber}</p>
+          {plant ? (
+            <>
+              <p className="mt-1 text-xs font-bold text-[#8a6b45]">
+                {getFarmPlantIcon(plant)} {plant.name} · {FARM_STAGE_LABELS[plant.stage]}
+              </p>
+              <p className="mt-1 text-xs font-black text-[#5e8e57]">
+                {plant.currentGrowth}/{plant.growthRequiredRecords} registros
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-xs font-bold text-[#8a6b45]">Status: vazio</p>
+          )}
+        </div>
+        {plant ? (
+          <span
+            className={`shrink-0 rounded-2xl px-3 py-1 text-xs font-black shadow-tile ${
+              plot.status === "completed"
+                ? "bg-[#dff3c8] text-[#375629]"
+                : "bg-[#F7D66B] text-[#5f3f23]"
+            }`}
+          >
+            {plot.status === "completed" ? "Completa" : "Crescendo"}
+          </span>
+        ) : null}
+      </div>
+
+      {plant ? (
+        <div className="mt-3 h-4 rounded-full border-2 border-[#6aa85c] bg-[#fff7df] p-0.5">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-[#7CC576] to-[#F7D66B] transition-all"
+            style={{
+              width: `${Math.min(100, (plant.currentGrowth / plant.growthRequiredRecords) * 100)}%`,
+            }}
+          />
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {seedInventory.length === 0 ? (
+            <span className="rounded-2xl bg-[#fff0c8] px-3 py-2 text-xs font-black text-[#7c6242]">
+              Sem sementes
+            </span>
+          ) : (
+            seedInventory.map((item) => {
+              const shopItem = getFarmShopItem(item.itemId);
+              return (
+                <button
+                  key={item.itemId}
+                  type="button"
+                  onClick={() => onPlant(item.itemId, plot.id)}
+                  className="rounded-2xl border-2 border-[#8b613b] bg-[#7CC576] px-3 py-2 text-xs font-black text-white shadow-tile active:scale-95"
+                >
+                  Plantar {shopItem?.name.replace(/^Semente de\s+/i, "") ?? "semente"} x
+                  {item.quantity}
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
   );
 }

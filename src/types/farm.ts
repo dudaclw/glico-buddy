@@ -1,50 +1,77 @@
-export type PlantType = "carrot" | "strawberry" | "sunflower" | "corn" | "pumpkin";
+export type FarmPlotStatus = "empty" | "growing" | "completed";
+export type FarmPlantStage = "seed" | "sprout" | "growing" | "completed";
 
-export interface Plant {
+export type FarmPlot = {
   id: string;
-  type: PlantType;
-  growthStage: number;
-  maxStage: 5;
-}
+  plantId: string | null;
+  status: FarmPlotStatus;
+};
+
+export type FarmPlant = {
+  id: string;
+  seedItemId: string;
+  plotId: string;
+  name: string;
+  currentGrowth: number;
+  growthRequiredRecords: number;
+  stage: FarmPlantStage;
+  plantedAt: string;
+  completedAt?: string;
+};
 
 export interface Farm {
   totalMeasurements: number;
-  unlockedPlants: PlantType[];
-  currentPlant: Plant;
-  harvestedPlants: PlantType[];
+  plots: FarmPlot[];
+  plants: FarmPlant[];
 }
 
-export type PlantDefinition = {
-  type: PlantType;
-  label: string;
-  icon: string;
-  unlockAt: number;
+export type FarmPlantingResult = {
+  success: boolean;
+  message: string;
+  farm: Farm;
 };
 
 export type FarmAdvanceResult = {
   farm: Farm;
-  grewPlant: Plant;
-  harvestedPlant?: Plant;
-  unlockedPlants: PlantType[];
+  progressedPlants: FarmPlant[];
+  completedPlants: FarmPlant[];
 };
 
-export const PLANT_MAX_STAGE = 5;
+export const FARM_PLOT_COUNT = 5;
 
-export const PLANT_CATALOG: PlantDefinition[] = [
-  { type: "carrot", label: "Cenoura", icon: "🥕", unlockAt: 3 },
-  { type: "strawberry", label: "Morango", icon: "🍓", unlockAt: 10 },
-  { type: "sunflower", label: "Girassol", icon: "🌻", unlockAt: 25 },
-  { type: "corn", label: "Milho", icon: "🌽", unlockAt: 50 },
-  { type: "pumpkin", label: "Abóbora", icon: "🎃", unlockAt: 100 },
-];
+export const FARM_STAGE_LABELS: Record<FarmPlantStage, string> = {
+  seed: "Semente",
+  sprout: "Brotinho",
+  growing: "Crescendo",
+  completed: "Completa",
+};
 
-export const GROWTH_STAGE_ICONS = ["🌰", "🌱", "🌿", "🌼"] as const;
+export const FARM_STAGE_ICONS: Record<FarmPlantStage, string> = {
+  seed: "🌱",
+  sprout: "🌿",
+  growing: "🌾",
+  completed: "🌼",
+};
 
-export function getPlantDefinition(type: PlantType) {
-  return PLANT_CATALOG.find((plant) => plant.type === type) ?? PLANT_CATALOG[0];
+export const SEED_COMPLETED_ICONS: Record<string, string> = {
+  seed_carrot: "🥕",
+  seed_strawberry: "🍓",
+  seed_sunflower: "🌻",
+};
+
+export function getFarmPlantStage(currentGrowth: number, growthRequiredRecords: number) {
+  if (growthRequiredRecords <= 0 || currentGrowth >= growthRequiredRecords) return "completed";
+
+  const progressRatio = currentGrowth / growthRequiredRecords;
+  if (progressRatio >= 0.66) return "growing";
+  if (progressRatio >= 0.33) return "sprout";
+  return "seed";
 }
 
-export function getPlantStageIcon(plant: Plant) {
-  if (plant.growthStage >= plant.maxStage) return getPlantDefinition(plant.type).icon;
-  return GROWTH_STAGE_ICONS[Math.max(0, plant.growthStage - 1)] ?? GROWTH_STAGE_ICONS[0];
+export function getFarmPlantIcon(plant: FarmPlant) {
+  if (plant.stage === "completed") {
+    return SEED_COMPLETED_ICONS[plant.seedItemId] ?? FARM_STAGE_ICONS.completed;
+  }
+
+  return FARM_STAGE_ICONS[plant.stage];
 }

@@ -1,11 +1,20 @@
 import {
-  PLANT_CATALOG,
-  PLANT_MAX_STAGE,
+  FARM_PLOT_COUNT,
+  getFarmPlantStage,
   type Farm,
   type FarmAdvanceResult,
-  type Plant,
-  type PlantType,
+  type FarmPlant,
+  type FarmPlantingResult,
+  type FarmPlot,
+  type FarmPlotStatus,
+  type FarmPlantStage,
 } from "@/types/farm";
+import {
+  getFarmInventory,
+  getFarmShopItem,
+  saveFarmInventory,
+  type FarmInventoryItem,
+} from "@/services/farmShop";
 
 export const FARM_STORAGE_KEY = "glicotrack_farm";
 export const FARM_CHANGED_EVENT = "glicotrack_farm_changed";
@@ -14,11 +23,11 @@ function canUseStorage() {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
 
-function createId() {
+function createId(prefix: string) {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
+    return `${prefix}_${crypto.randomUUID()}`;
   }
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
 function notifyFarmChanged() {
@@ -27,61 +36,73 @@ function notifyFarmChanged() {
   }
 }
 
-function getUnlockedPlants(totalMeasurements: number): PlantType[] {
-  return PLANT_CATALOG.filter((plant) => totalMeasurements >= plant.unlockAt).map(
-    (plant) => plant.type,
-  );
+function createInitialPlots(): FarmPlot[] {
+  return Array.from({ length: FARM_PLOT_COUNT }, (_, index) => ({
+    id: `plot_${index + 1}`,
+    plantId: null,
+    status: "empty",
+  }));
 }
 
-function choosePlantType(unlockedPlants: PlantType[]) {
-  const availablePlants = unlockedPlants.length > 0 ? unlockedPlants : ["carrot" as PlantType];
-  return availablePlants[Math.floor(Math.random() * availablePlants.length)] ?? "carrot";
-}
-
-function createPlant(type: PlantType, growthStage = 0): Plant {
+export function createEmptyFarm(totalMeasurements = 0): Farm {
   return {
-    id: createId(),
-    type,
-    growthStage,
-    maxStage: PLANT_MAX_STAGE,
+    totalMeasurements,
+    plots: createInitialPlots(),
+    plants: [],
   };
 }
 
-export function createEmptyFarm(): Farm {
-  return {
-    totalMeasurements: 0,
-    unlockedPlants: [],
-    currentPlant: {
-      id: "initial-seed",
-      type: "carrot",
-      growthStage: 0,
-      maxStage: PLANT_MAX_STAGE,
-    },
-    harvestedPlants: [],
-  };
-}
-
-function normalizePlant(value: unknown): Plant | null {
+function normalizePlot(value: unknown): FarmPlot | null {
   if (!value || typeof value !== "object") return null;
   const item = value as Record<string, unknown>;
-  const type = item.type;
-  const growthStage = Number(item.growthStage);
-  const isKnownType = PLANT_CATALOG.some((plant) => plant.type === type);
+  const status = item.status;
 
   if (
     typeof item.id !== "string" ||
-    !isKnownType ||
-    !Number.isFinite(growthStage) ||
-    growthStage < 0
+    !["empty", "growing", "completed"].includes(String(status))
   ) {
     return null;
   }
 
   return {
-    id: String(item.id),
-    type: type as PlantType,
-    growthStage: Math.min(PLANT_MAX_STAGE, Math.max(0, Math.round(growthStage))),
-    maxStage: PLANT_MAX_STAGE,
+    id: item.id,
+    plantId: typeof item.plantId === "string" ? item.plantId : null,
+    status: status as FarmPlotStatus,
+  };
+}
+
+function normalizePlant(value: unknown): FarmPlant | null {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Record<string, unknown>;
+  const currentGrowth = Number(item.currentGrowth);
+  const growthRequiredRecords = Number(item.growthRequiredRecords);
+  const stage = item.stage;
+
+  if (
+    typeof item.id !== "string" ||
+    typeof item.seedItemId !== "string" ||
+    typeof item.plotId !== "string" ||
+    typeof item.name !== "string" ||
+    typeof item.plantedAt !== "string" ||
+    !Number.isFinite(currentGrowth) ||
+    currentGrowth < 0 ||
+    !Number.isFinite(growthRequiredRecords) ||
+    growthRequiredRecords <= 0 ||
+    !["seed", "sprout", "growing", "completed"].includes(String(stage))
+  ) {
+    return null;
+  }
+
+  return {
+    id: item.id,
+    seedItemId: item.seedItemId,
+    plotId: item.plotId,
+    name: item.name,
+    currentGrowth: Math.min(Math.round(currentGrowth), Math.round(growthRequiredRecords)),
+    growthRequiredRecords: Math.round(growthRequiredRecords),
+    stage: stage as FarmPlantStage,
+    plantedAt: item.plantedAt,
+    completedAt: typeof item.completedAt === "string" ? item.completedAt : undefined,
   };
 }
 
@@ -89,46 +110,39 @@ function normalizeFarm(value: unknown): Farm | null {
   if (!value || typeof value !== "object") return null;
   const item = value as Record<string, unknown>;
   const totalMeasurements = Number(item.totalMeasurements);
-  const currentPlant = normalizePlant(item.currentPlant);
 
-  if (!Number.isFinite(totalMeasurements) || totalMeasurements < 0 || !currentPlant) {
+  if (!Number.isFinite(totalMeasurements) || totalMeasurements < 0) {
     return null;
   }
 
-  const unlockedPlants = Array.isArray(item.unlockedPlants)
-    ? item.unlockedPlants.filter((type): type is PlantType =>
-        PLANT_CATALOG.some((plant) => plant.type === type),
-      )
+  const normalizedPlants = Array.isArray(item.plants)
+    ? item.plants.map(normalizePlant).filter((plant): plant is FarmPlant => Boolean(plant))
     : [];
-  const harvestedPlants = Array.isArray(item.harvestedPlants)
-    ? item.harvestedPlants.filter((type): type is PlantType =>
-        PLANT_CATALOG.some((plant) => plant.type === type),
-      )
+  const normalizedPlots = Array.isArray(item.plots)
+    ? item.plots.map(normalizePlot).filter((plot): plot is FarmPlot => Boolean(plot))
     : [];
+  const plots = createInitialPlots().map((defaultPlot) => {
+    const storedPlot = normalizedPlots.find((plot) => plot.id === defaultPlot.id);
+    if (!storedPlot) return defaultPlot;
+
+    const linkedPlant = storedPlot.plantId
+      ? normalizedPlants.find((plant) => plant.id === storedPlot.plantId)
+      : null;
+
+    if (!linkedPlant) return defaultPlot;
+
+    return {
+      ...storedPlot,
+      status: linkedPlant.stage === "completed" ? "completed" : "growing",
+    };
+  });
+  const plotIds = new Set(plots.map((plot) => plot.id));
+  const plants = normalizedPlants.filter((plant) => plotIds.has(plant.plotId));
 
   return {
     totalMeasurements: Math.round(totalMeasurements),
-    unlockedPlants,
-    currentPlant,
-    harvestedPlants,
-  };
-}
-
-function buildFarmFromMeasurements(measurementCount: number): Farm {
-  const totalMeasurements = Math.max(0, measurementCount);
-  const unlockedPlants = getUnlockedPlants(totalMeasurements);
-  const harvestedCount = Math.floor(totalMeasurements / PLANT_MAX_STAGE);
-  const growthStage = totalMeasurements % PLANT_MAX_STAGE;
-  const availablePlants = unlockedPlants.length > 0 ? unlockedPlants : ["carrot" as PlantType];
-  const harvestedPlants = Array.from({ length: Math.min(4, harvestedCount) }, (_, index) => {
-    return availablePlants[index % availablePlants.length] ?? "carrot";
-  });
-
-  return {
-    totalMeasurements,
-    unlockedPlants,
-    currentPlant: createPlant(choosePlantType(unlockedPlants), growthStage),
-    harvestedPlants,
+    plots,
+    plants,
   };
 }
 
@@ -138,15 +152,15 @@ function saveFarm(farm: Farm) {
   notifyFarmChanged();
 }
 
-export function getFarm(measurementCount = 0): Farm {
+export function getFarm(totalMeasurements = 0): Farm {
   if (!canUseStorage()) {
-    return measurementCount > 0 ? buildFarmFromMeasurements(measurementCount) : createEmptyFarm();
+    return createEmptyFarm(totalMeasurements);
   }
 
   try {
     const raw = window.localStorage.getItem(FARM_STORAGE_KEY);
     if (!raw) {
-      const farm = buildFarmFromMeasurements(measurementCount);
+      const farm = createEmptyFarm(totalMeasurements);
       saveFarm(farm);
       return farm;
     }
@@ -154,54 +168,162 @@ export function getFarm(measurementCount = 0): Farm {
     const parsed = JSON.parse(raw);
     const farm = normalizeFarm(parsed);
     if (!farm) {
-      const rebuiltFarm = buildFarmFromMeasurements(measurementCount);
-      saveFarm(rebuiltFarm);
-      return rebuiltFarm;
+      const emptyFarm = createEmptyFarm(totalMeasurements);
+      saveFarm(emptyFarm);
+      return emptyFarm;
     }
 
-    if (measurementCount > farm.totalMeasurements) {
-      const reconciledFarm = buildFarmFromMeasurements(measurementCount);
-      saveFarm(reconciledFarm);
-      return reconciledFarm;
-    }
-
-    return {
+    const nextFarm = {
       ...farm,
-      unlockedPlants: getUnlockedPlants(farm.totalMeasurements),
+      totalMeasurements: Math.max(farm.totalMeasurements, totalMeasurements),
     };
+
+    if (nextFarm.totalMeasurements !== farm.totalMeasurements) {
+      saveFarm(nextFarm);
+    }
+
+    return nextFarm;
   } catch {
-    const rebuiltFarm = buildFarmFromMeasurements(measurementCount);
-    saveFarm(rebuiltFarm);
-    return rebuiltFarm;
+    const emptyFarm = createEmptyFarm(totalMeasurements);
+    saveFarm(emptyFarm);
+    return emptyFarm;
   }
 }
 
-export function advanceFarmAfterMeasurement(measurementCount = 0): FarmAdvanceResult {
-  const farm = getFarm(measurementCount);
-  const totalMeasurements = farm.totalMeasurements + 1;
-  const unlockedPlants = getUnlockedPlants(totalMeasurements);
-  const newlyUnlockedPlants = unlockedPlants.filter((type) => !farm.unlockedPlants.includes(type));
-  const grewPlant: Plant = {
-    ...farm.currentPlant,
-    growthStage: Math.min(farm.currentPlant.growthStage + 1, PLANT_MAX_STAGE),
-  };
-  const harvestedPlant = grewPlant.growthStage >= PLANT_MAX_STAGE ? grewPlant : undefined;
+function removeSeedFromInventory(inventory: FarmInventoryItem[], seedItemId: string) {
+  return inventory
+    .map((item) =>
+      item.itemId === seedItemId ? { ...item, quantity: item.quantity - 1 } : item,
+    )
+    .filter((item) => item.quantity > 0);
+}
 
+function getSeedPlantName(seedName: string) {
+  return seedName.replace(/^Semente de\s+/i, "").trim() || seedName;
+}
+
+export function plantSeedOnPlot(seedItemId: string, plotId: string): FarmPlantingResult {
+  const farm = getFarm();
+  const plot = farm.plots.find((currentPlot) => currentPlot.id === plotId);
+
+  if (!plot) {
+    return {
+      success: false,
+      message: "Canteiro não encontrado.",
+      farm,
+    };
+  }
+
+  if (plot.status !== "empty" || plot.plantId) {
+    return {
+      success: false,
+      message: "Este canteiro já possui uma planta.",
+      farm,
+    };
+  }
+
+  const inventory = getFarmInventory();
+  const inventoryItem = inventory.find(
+    (item) => item.itemId === seedItemId && item.type === "seed",
+  );
+
+  if (!inventoryItem || inventoryItem.quantity <= 0) {
+    return {
+      success: false,
+      message: "Você não possui essa semente no inventário.",
+      farm,
+    };
+  }
+
+  const seedConfig = getFarmShopItem(seedItemId);
+
+  if (!seedConfig || seedConfig.type !== "seed" || !seedConfig.growthRequiredRecords) {
+    return {
+      success: false,
+      message: "Configuração da semente não encontrada.",
+      farm,
+    };
+  }
+
+  const newPlant: FarmPlant = {
+    id: createId("plant"),
+    seedItemId: seedConfig.id,
+    plotId: plot.id,
+    name: getSeedPlantName(seedConfig.name),
+    currentGrowth: 0,
+    growthRequiredRecords: seedConfig.growthRequiredRecords,
+    stage: "seed",
+    plantedAt: new Date().toISOString(),
+  };
   const nextFarm: Farm = {
-    totalMeasurements,
-    unlockedPlants,
-    currentPlant: harvestedPlant ? createPlant(choosePlantType(unlockedPlants), 0) : grewPlant,
-    harvestedPlants: harvestedPlant
-      ? [harvestedPlant.type, ...farm.harvestedPlants].slice(0, 4)
-      : farm.harvestedPlants,
+    ...farm,
+    plots: farm.plots.map((currentPlot) =>
+      currentPlot.id === plot.id
+        ? {
+            ...currentPlot,
+            plantId: newPlant.id,
+            status: "growing",
+          }
+        : currentPlot,
+    ),
+    plants: [...farm.plants, newPlant],
+  };
+
+  saveFarmInventory(removeSeedFromInventory(inventory, seedItemId));
+  saveFarm(nextFarm);
+
+  return {
+    success: true,
+    message: `${newPlant.name} plantada com sucesso!`,
+    farm: nextFarm,
+  };
+}
+
+export function progressFarmPlantsAfterGlucoseRecord(): FarmAdvanceResult {
+  const farm = getFarm();
+  const now = new Date().toISOString();
+  const progressedPlants: FarmPlant[] = [];
+  const completedPlants: FarmPlant[] = [];
+  const plants = farm.plants.map((plant) => {
+    if (plant.stage === "completed") return plant;
+
+    const nextGrowth = Math.min(plant.currentGrowth + 1, plant.growthRequiredRecords);
+    const nextStage = getFarmPlantStage(nextGrowth, plant.growthRequiredRecords);
+    const nextPlant: FarmPlant = {
+      ...plant,
+      currentGrowth: nextGrowth,
+      stage: nextStage,
+      completedAt: nextStage === "completed" ? plant.completedAt ?? now : plant.completedAt,
+    };
+
+    progressedPlants.push(nextPlant);
+
+    if (nextStage === "completed" && plant.stage !== "completed") {
+      completedPlants.push(nextPlant);
+    }
+
+    return nextPlant;
+  });
+  const completedPlantIds = new Set(completedPlants.map((plant) => plant.id));
+  const nextFarm: Farm = {
+    ...farm,
+    totalMeasurements: farm.totalMeasurements + 1,
+    plants,
+    plots: farm.plots.map((plot) =>
+      plot.plantId && completedPlantIds.has(plot.plantId)
+        ? {
+            ...plot,
+            status: "completed",
+          }
+        : plot,
+    ),
   };
 
   saveFarm(nextFarm);
 
   return {
     farm: nextFarm,
-    grewPlant,
-    harvestedPlant,
-    unlockedPlants: newlyUnlockedPlants,
+    progressedPlants,
+    completedPlants,
   };
 }

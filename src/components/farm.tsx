@@ -5,12 +5,11 @@ import canteiroImage from "@/canteiro.png";
 import { CozyCard } from "@/components/cozy";
 import { cn } from "@/lib/utils";
 import {
-  PLANT_CATALOG,
-  getPlantDefinition,
-  getPlantStageIcon,
+  FARM_STAGE_LABELS,
+  getFarmPlantIcon,
   type Farm,
   type FarmAdvanceResult,
-  type Plant,
+  type FarmPlant,
 } from "@/types/farm";
 
 const glicoMessages = {
@@ -44,12 +43,12 @@ export function FarmScene({
       aria-label="Canteiros da Fazenda da Saúde"
       role="img"
     >
-      {plots.map((plot, index) => (
+      {plots.map(({ plot, plant }, index) => (
         <div
-          key={`${plot?.id ?? "empty"}-${index}`}
+          key={plot.id}
           className={cn(
             "relative grid aspect-square min-w-0 place-items-center overflow-visible",
-            highlightCurrent && index === 0 && "animate-grow-pop",
+            highlightCurrent && plant && index === 0 && "animate-grow-pop",
           )}
         >
           <img
@@ -58,17 +57,17 @@ export function FarmScene({
             className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain pixel-mascot"
             draggable={false}
           />
-          {plot && <PlantPlotVisual plot={plot} compact={compact} />}
+          {plant && <PlantPlotVisual plant={plant} compact={compact} />}
         </div>
       ))}
     </div>
   );
 }
 
-function PlantPlotVisual({ plot, compact }: { plot: Plant; compact: boolean }) {
-  const plantIcon = getPlantStageIcon(plot);
+function PlantPlotVisual({ plant, compact }: { plant: FarmPlant; compact: boolean }) {
+  const plantIcon = getFarmPlantIcon(plant);
 
-  if (plantIcon === "🌰") {
+  if (plant.stage === "seed" || plant.stage === "sprout") {
     return (
       <img
         src={brotinhoImage}
@@ -97,11 +96,9 @@ function PlantPlotVisual({ plot, compact }: { plot: Plant; compact: boolean }) {
 }
 
 export function FarmDashboardCard({ farm }: { farm: Farm }) {
-  const currentPlant = getPlantDefinition(farm.currentPlant.type);
-  const progressBlocks = getProgressBlocks(
-    farm.currentPlant.growthStage,
-    farm.currentPlant.maxStage,
-  );
+  const activePlants = farm.plants.filter((plant) => plant.stage !== "completed");
+  const completedPlants = farm.plants.filter((plant) => plant.stage === "completed");
+  const nextPlant = activePlants[0] ?? completedPlants[0] ?? null;
 
   return (
     <CozyCard variant="grass" className="overflow-hidden">
@@ -127,20 +124,22 @@ export function FarmDashboardCard({ farm }: { farm: Farm }) {
           <span>{farm.totalMeasurements}</span>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <span>Planta em crescimento</span>
-          <span>
-            {currentPlant.icon} {currentPlant.label}
-          </span>
+          <span>Plantas ativas</span>
+          <span>{activePlants.length}</span>
         </div>
-        <div>
-          <div className="flex items-center justify-between gap-2">
-            <span>Próxima colheita</span>
-            <span>
-              {farm.currentPlant.growthStage}/{farm.currentPlant.maxStage}
-            </span>
+        {nextPlant ? (
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <span>{nextPlant.name}</span>
+              <span>
+                {nextPlant.currentGrowth}/{nextPlant.growthRequiredRecords}
+              </span>
+            </div>
+            <div className="mt-1 text-lg tracking-wide text-[#5e8e57]">
+              {getProgressBlocks(nextPlant.currentGrowth, nextPlant.growthRequiredRecords)}
+            </div>
           </div>
-          <div className="mt-1 text-lg tracking-wide text-[#5e8e57]">{progressBlocks}</div>
-        </div>
+        ) : null}
       </div>
     </CozyCard>
   );
@@ -178,28 +177,26 @@ export function GlicoMascot({
 }
 
 export function FarmUnlockList({ farm }: { farm: Farm }) {
+  const plantedSeedIds = new Set(farm.plants.map((plant) => plant.seedItemId));
+
   return (
     <div className="grid gap-2">
-      {PLANT_CATALOG.map((plant) => {
-        const unlocked = farm.unlockedPlants.includes(plant.type);
-        const remaining = Math.max(0, plant.unlockAt - farm.totalMeasurements);
-        return (
-          <div
-            key={plant.type}
-            className={cn(
-              "flex items-center justify-between rounded-2xl border-2 px-3 py-3 text-sm font-black shadow-tile",
-              unlocked
-                ? "border-[#82cf67] bg-[#dff3c8] text-[#375629]"
-                : "border-[#dcbf8b] bg-[#fffdf4] text-[#7c6242]",
-            )}
-          >
-            <span>
-              {plant.icon} {plant.label}
-            </span>
-            <span>{unlocked ? "desbloqueada" : `${remaining} registros`}</span>
-          </div>
-        );
-      })}
+      {farm.plants.map((plant) => (
+        <div
+          key={plant.id}
+          className="flex items-center justify-between rounded-2xl border-2 border-[#82cf67] bg-[#dff3c8] px-3 py-3 text-sm font-black text-[#375629] shadow-tile"
+        >
+          <span>
+            {getFarmPlantIcon(plant)} {plant.name}
+          </span>
+          <span>{FARM_STAGE_LABELS[plant.stage]}</span>
+        </div>
+      ))}
+      {plantedSeedIds.size === 0 ? (
+        <p className="rounded-2xl border-2 border-[#dcbf8b] bg-[#fffdf4] px-3 py-3 text-sm font-black text-[#7c6242] shadow-tile">
+          Nenhuma planta plantada ainda.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -211,16 +208,14 @@ export function FarmFeedbackModal({
   result: FarmAdvanceResult;
   rewardAmount?: number;
 }) {
-  const hasHarvest = Boolean(result.harvestedPlant);
-  const unlockedPlant = result.unlockedPlants[0]
-    ? getPlantDefinition(result.unlockedPlants[0])
-    : null;
+  const completedPlant = result.completedPlants[0] ?? null;
+  const progressedPlant = result.progressedPlants[0] ?? completedPlant;
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-[#4a3828]/20 px-4 backdrop-blur-sm">
       <div className="w-full max-w-sm rounded-[1.5rem] border-2 border-[#8b613b] bg-[#fff7e6] p-5 text-center shadow-cozy animate-grow-pop">
         <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl border-2 border-[#8b613b] bg-[#dff3c8] text-4xl shadow-tile">
-          {getPlantStageIcon(result.grewPlant)}
+          {progressedPlant ? getFarmPlantIcon(progressedPlant) : "🌱"}
         </div>
         <div className="mt-3 flex items-center justify-center gap-1 text-[#f0b64b]">
           <Sparkles className="h-4 w-4 fill-current" />
@@ -228,35 +223,32 @@ export function FarmFeedbackModal({
           <Sparkles className="h-4 w-4 fill-current" />
         </div>
         <h2 className="mt-2 text-2xl font-black text-[#4a3828]">
-          {hasHarvest ? "Colheita pronta!" : "Registro realizado!"}
+          {completedPlant ? "Planta completa!" : "Registro realizado!"}
         </h2>
         <p className="mt-1 text-sm font-bold text-[#7c6242]">
-          {hasHarvest ? "Uma nova semente foi plantada." : "Sua plantinha cresceu."}
+          {completedPlant
+            ? `Sua ${completedPlant.name} terminou de crescer!`
+            : result.progressedPlants.length > 0
+              ? "Suas plantas receberam cuidado com este registro!"
+              : "Plante uma semente para começar sua fazendinha."}
         </p>
         {rewardAmount ? (
           <p className="mt-3 rounded-2xl bg-[#F7D66B] px-3 py-2 text-sm font-black text-[#5f3f23]">
             Você ganhou +{rewardAmount} ATP.
           </p>
         ) : null}
-        {unlockedPlant && (
-          <p className="mt-3 rounded-2xl bg-[#dff3c8] px-3 py-2 text-sm font-black text-[#375629]">
-            {unlockedPlant.icon} {unlockedPlant.label} desbloqueada
-          </p>
-        )}
       </div>
     </div>
   );
 }
 
-function getFarmPlots(farm: Farm): Array<Plant | null> {
-  const harvestedPlots = farm.harvestedPlants.slice(0, 4).map((type, index) => ({
-    id: `${type}-${index}`,
-    type,
-    growthStage: 5,
-    maxStage: 5 as const,
+function getFarmPlots(farm: Farm) {
+  return farm.plots.map((plot) => ({
+    plot,
+    plant: plot.plantId
+      ? farm.plants.find((candidate) => candidate.id === plot.plantId) ?? null
+      : null,
   }));
-
-  return [farm.currentPlant, ...harvestedPlots, null, null, null, null].slice(0, 5);
 }
 
 function getProgressBlocks(current: number, total: number) {

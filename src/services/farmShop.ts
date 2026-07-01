@@ -99,7 +99,7 @@ export function getFarmInventory(): FarmInventoryItem[] {
   }
 }
 
-function saveFarmInventory(inventory: FarmInventoryItem[]) {
+export function saveFarmInventory(inventory: FarmInventoryItem[]) {
   if (!canUseStorage()) return;
   window.localStorage.setItem(
     FARM_INVENTORY_STORAGE_KEY,

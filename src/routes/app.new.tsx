@@ -4,8 +4,7 @@ import { useMemo, useState } from "react";
 import { CozyCard, GlucoseStatusBadge, InsulinStepper, PeriodSelector } from "@/components/cozy";
 import { FarmFeedbackModal } from "@/components/farm";
 import { useMeasurements } from "@/hooks/useMeasurements";
-import { advanceFarmAfterMeasurement } from "@/services/farm";
-import { getMeasurements } from "@/services/measurements";
+import { progressFarmPlantsAfterGlucoseRecord } from "@/services/farm";
 import type { FarmAdvanceResult } from "@/types/farm";
 import type { PeriodId } from "@/types/measurement";
 import { formatDateKey } from "@/utils/measurementCalculations";
@@ -49,7 +48,6 @@ function NewMeasurement() {
     setAttemptedSave(true);
     if (!canSave) return;
     if (!period) return;
-    const measurementCountBeforeSave = getMeasurements().length;
     const result = createMeasurement({
       date,
       time,
@@ -58,8 +56,8 @@ function NewMeasurement() {
       insulinUnits,
       notes,
     });
-    const farmResult = advanceFarmAfterMeasurement(measurementCountBeforeSave);
-    setFarmFeedback(farmResult);
+    const farmResult = progressFarmPlantsAfterGlucoseRecord();
+    setFarmFeedback(farmResult.progressedPlants.length > 0 ? farmResult : null);
     setSavedReward(result.rewardAmount);
     setSaved(true);
     setAttemptedSave(false);
