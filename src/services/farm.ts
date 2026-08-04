@@ -57,10 +57,7 @@ function normalizePlot(value: unknown): FarmPlot | null {
   const item = value as Record<string, unknown>;
   const status = item.status;
 
-  if (
-    typeof item.id !== "string" ||
-    !["empty", "growing", "completed"].includes(String(status))
-  ) {
+  if (typeof item.id !== "string" || !["empty", "growing", "completed"].includes(String(status))) {
     return null;
   }
 
@@ -192,9 +189,7 @@ export function getFarm(totalMeasurements = 0): Farm {
 
 function removeSeedFromInventory(inventory: FarmInventoryItem[], seedItemId: string) {
   return inventory
-    .map((item) =>
-      item.itemId === seedItemId ? { ...item, quantity: item.quantity - 1 } : item,
-    )
+    .map((item) => (item.itemId === seedItemId ? { ...item, quantity: item.quantity - 1 } : item))
     .filter((item) => item.quantity > 0);
 }
 
@@ -279,6 +274,40 @@ export function plantSeedOnPlot(seedItemId: string, plotId: string): FarmPlantin
   };
 }
 
+export function harvestPlot(plotId: string): FarmPlantingResult {
+  const farm = getFarm();
+  const plot = farm.plots.find((currentPlot) => currentPlot.id === plotId);
+
+  if (!plot || plot.status !== "completed" || !plot.plantId) {
+    return {
+      success: false,
+      message: "Este canteiro ainda não está pronto para colher.",
+      farm,
+    };
+  }
+
+  const plant = farm.plants.find((currentPlant) => currentPlant.id === plot.plantId);
+  const nextFarm: Farm = {
+    ...farm,
+    plots: farm.plots.map((currentPlot) =>
+      currentPlot.id === plotId
+        ? { id: currentPlot.id, plantId: null, status: "empty" }
+        : currentPlot,
+    ),
+    plants: farm.plants.filter((currentPlant) => currentPlant.id !== plot.plantId),
+  };
+
+  saveFarm(nextFarm);
+
+  return {
+    success: true,
+    message: plant
+      ? `${plant.name} colhida! O canteiro está livre para plantar de novo.`
+      : "Canteiro colhido!",
+    farm: nextFarm,
+  };
+}
+
 export function progressFarmPlantsAfterGlucoseRecord(): FarmAdvanceResult {
   const farm = getFarm();
   const now = new Date().toISOString();
@@ -293,7 +322,7 @@ export function progressFarmPlantsAfterGlucoseRecord(): FarmAdvanceResult {
       ...plant,
       currentGrowth: nextGrowth,
       stage: nextStage,
-      completedAt: nextStage === "completed" ? plant.completedAt ?? now : plant.completedAt,
+      completedAt: nextStage === "completed" ? (plant.completedAt ?? now) : plant.completedAt,
     };
 
     progressedPlants.push(nextPlant);

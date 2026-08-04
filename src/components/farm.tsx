@@ -22,11 +22,13 @@ export function FarmScene({
   farm,
   compact = false,
   highlightCurrent = false,
+  showNumbers = false,
   className,
 }: {
   farm: Farm;
   compact?: boolean;
   highlightCurrent?: boolean;
+  showNumbers?: boolean;
   className?: string;
 }) {
   const plots = getFarmPlots(farm);
@@ -58,6 +60,11 @@ export function FarmScene({
             draggable={false}
           />
           {plant && <PlantPlotVisual plant={plant} compact={compact} />}
+          {showNumbers && (
+            <span className="absolute -bottom-1 left-1/2 z-20 grid h-4 w-4 -translate-x-1/2 place-items-center rounded-full border border-[#8b613b] bg-[#FFF7E6] text-[9px] font-black leading-none text-[#5f3f23]">
+              {index + 1}
+            </span>
+          )}
         </div>
       ))}
     </div>
@@ -246,7 +253,7 @@ function getFarmPlots(farm: Farm) {
   return farm.plots.map((plot) => ({
     plot,
     plant: plot.plantId
-      ? farm.plants.find((candidate) => candidate.id === plot.plantId) ?? null
+      ? (farm.plants.find((candidate) => candidate.id === plot.plantId) ?? null)
       : null,
   }));
 }

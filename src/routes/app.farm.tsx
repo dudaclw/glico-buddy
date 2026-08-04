@@ -8,7 +8,7 @@ import { useFarm } from "@/hooks/useFarm";
 import { useFarmShop } from "@/hooks/useFarmShop";
 import { useProfile } from "@/hooks/useProfile";
 import { useRewards } from "@/hooks/useRewards";
-import { plantSeedOnPlot } from "@/services/farm";
+import { harvestPlot, plantSeedOnPlot } from "@/services/farm";
 import { farmShopItems, getFarmShopItem, type FarmInventoryItem } from "@/services/farmShop";
 import { FARM_STAGE_LABELS, getFarmPlantIcon, type Farm, type FarmPlot } from "@/types/farm";
 
@@ -59,6 +59,13 @@ function FarmPage() {
     refreshInventory();
   }
 
+  function harvestPlotAndFree(plotId: string) {
+    const result = harvestPlot(plotId);
+    setFarmMessage(result.message);
+    setFarmMessageType(result.success ? "success" : "error");
+    refreshFarm();
+  }
+
   return (
     <>
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 bg-farm-background" />
@@ -72,7 +79,7 @@ function FarmPage() {
       </div>
       <div className="pointer-events-none fixed inset-x-0 top-[clamp(20rem,48vh,24rem)] z-20 px-4">
         <div className="mx-auto max-w-md">
-          <FarmScene farm={farm} highlightCurrent />
+          <FarmScene farm={farm} highlightCurrent showNumbers />
         </div>
       </div>
       <header className="fixed inset-x-0 top-3 z-30 px-16">
@@ -102,7 +109,13 @@ function FarmPage() {
         <PackageCheck className="h-6 w-6" strokeWidth={3} />
       </button>
 
-      <div className="fixed inset-x-0 bottom-[calc(10.5rem+env(safe-area-inset-bottom))] top-[calc(clamp(20rem,48vh,24rem)+clamp(3.75rem,18vw,6rem)+0.75rem)] z-10 overflow-y-auto overscroll-contain px-4 pb-4">
+      <div
+        className="fixed inset-x-0 bottom-[calc(10.5rem+env(safe-area-inset-bottom))] top-[calc(clamp(20rem,48vh,24rem)+clamp(3.75rem,18vw,6rem)+0.75rem)] z-10 overflow-y-auto overscroll-contain px-4 pb-9"
+        style={{
+          WebkitMaskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)",
+          maskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)",
+        }}
+      >
         <div className="mx-auto max-w-md space-y-4">
           {farmMessage && (
             <p
@@ -117,30 +130,31 @@ function FarmPage() {
           )}
 
           <CozyCard className="grid gap-3">
-            <button
-              type="button"
-              onClick={() => setPlotsOpen((current) => !current)}
-              aria-expanded={plotsOpen}
-              className="flex w-full items-center justify-between gap-3 rounded-2xl text-left active:scale-[0.99]"
-            >
-              <span className="min-w-0">
-                <span className="block text-base font-black text-[#4a3828]">Canteiros</span>
-                <span className="block text-xs font-bold text-[#8a6b45]">
-                  {farm.plants.length} planta{farm.plants.length === 1 ? "" : "s"} na fazendinha
-                </span>
-              </span>
-              <span className="flex shrink-0 items-center gap-2">
-                <span className="rounded-2xl bg-[#F7D66B] px-3 py-1 text-xs font-black text-[#5f3f23] shadow-tile">
-                  {seedInventory.reduce((total, item) => total + item.quantity, 0)} sementes
-                </span>
-                <span className="grid h-10 w-10 place-items-center rounded-2xl border-2 border-[#8b613b] bg-[#fff7e6] text-[#5f3f23] shadow-tile">
+            <div className="sticky top-0 z-10 -mx-[1.125rem] -mt-[1.125rem] grid gap-1 rounded-t-[1.35rem] bg-[#FFF7E6] px-[1.125rem] pb-3 pt-[1.125rem] shadow-[0_-10px_16px_-6px_rgba(74,56,40,0.35)]">
+              <button
+                type="button"
+                onClick={() => setPlotsOpen((current) => !current)}
+                aria-expanded={plotsOpen}
+                className="flex w-full items-center justify-between gap-3 text-left active:scale-[0.99]"
+              >
+                <span className="text-base font-black text-[#4a3828]">Canteiros</span>
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border-2 border-[#8b613b] bg-[#fff7e6] text-[#5f3f23] shadow-tile">
                   <ChevronDown
                     className={`h-5 w-5 transition-transform ${plotsOpen ? "rotate-180" : ""}`}
                     strokeWidth={3}
                   />
                 </span>
-              </span>
-            </button>
+              </button>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-bold text-[#8a6b45]">
+                  {farm.plants.length} planta{farm.plants.length === 1 ? "" : "s"} na fazendinha
+                </span>
+                <span className="shrink-0 rounded-2xl bg-[#F7D66B] px-3 py-1 text-xs font-black text-[#5f3f23] shadow-tile">
+                  {seedInventory.reduce((total, item) => total + item.quantity, 0)} sementes no
+                  estoque
+                </span>
+              </div>
+            </div>
 
             {plotsOpen && (
               <div className="grid gap-2">
@@ -152,6 +166,7 @@ function FarmPage() {
                     farm={farm}
                     seedInventory={seedInventory}
                     onPlant={plantSeed}
+                    onHarvest={harvestPlotAndFree}
                   />
                 ))}
               </div>
@@ -285,15 +300,17 @@ function FarmPlotRow({
   farm,
   seedInventory,
   onPlant,
+  onHarvest,
 }: {
   plot: FarmPlot;
   plotNumber: number;
   farm: Farm;
   seedInventory: FarmInventoryItem[];
   onPlant: (seedItemId: string, plotId: string) => void;
+  onHarvest: (plotId: string) => void;
 }) {
   const plant = plot.plantId
-    ? farm.plants.find((candidate) => candidate.id === plot.plantId) ?? null
+    ? (farm.plants.find((candidate) => candidate.id === plot.plantId) ?? null)
     : null;
 
   return (
@@ -328,14 +345,24 @@ function FarmPlotRow({
       </div>
 
       {plant ? (
-        <div className="mt-3 h-4 rounded-full border-2 border-[#6aa85c] bg-[#fff7df] p-0.5">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-[#7CC576] to-[#F7D66B] transition-all"
-            style={{
-              width: `${Math.min(100, (plant.currentGrowth / plant.growthRequiredRecords) * 100)}%`,
-            }}
-          />
-        </div>
+        plot.status === "completed" ? (
+          <button
+            type="button"
+            onClick={() => onHarvest(plot.id)}
+            className="mt-3 w-full rounded-2xl border-2 border-[#8b613b] bg-[#F7D66B] px-3 py-2 text-xs font-black text-[#5f3f23] shadow-tile active:scale-95"
+          >
+            Colher e liberar canteiro
+          </button>
+        ) : (
+          <div className="mt-3 h-4 rounded-full border-2 border-[#6aa85c] bg-[#fff7df] p-0.5">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#7CC576] to-[#F7D66B] transition-all"
+              style={{
+                width: `${Math.min(100, (plant.currentGrowth / plant.growthRequiredRecords) * 100)}%`,
+              }}
+            />
+          </div>
+        )
       ) : (
         <div className="mt-3 flex flex-wrap gap-2">
           {seedInventory.length === 0 ? (
