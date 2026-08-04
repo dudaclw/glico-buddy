@@ -1,18 +1,8 @@
-import { createFileRoute, Link, Outlet, redirect, useLocation } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { Sprout } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
-import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/app")({
-  beforeLoad: async () => {
-    // ponytail: session check só roda no client (supabase usa localStorage) — SSR passa direto.
-    // Se algum dia /app renderizar dados sensíveis no servidor, trocar por checagem via cookie/header.
-    if (typeof window === "undefined") return;
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) {
-      throw redirect({ to: "/login" });
-    }
-  },
   component: AppLayout,
 });
 
