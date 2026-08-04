@@ -86,6 +86,36 @@ function normalizeMeasurement(value: unknown): Measurement | null {
   };
 }
 
+function normalizeImportItem(value: unknown): MeasurementInput | null {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Record<string, unknown>;
+  const glucoseValue = Number(item.glucoseValue ?? item.glucose);
+  const insulinUnits =
+    item.insulinUnits === undefined || item.insulinUnits === ""
+      ? undefined
+      : Number(item.insulinUnits);
+
+  if (
+    !isDateKey(item.date) ||
+    !isTimeKey(item.time) ||
+    !isPeriodId(item.period) ||
+    !Number.isFinite(glucoseValue) ||
+    glucoseValue <= 0 ||
+    (insulinUnits !== undefined && (!Number.isFinite(insulinUnits) || insulinUnits < 0))
+  ) {
+    return null;
+  }
+
+  return {
+    date: String(item.date),
+    time: item.time ? String(item.time) : undefined,
+    period: item.period,
+    glucoseValue,
+    insulinUnits,
+    notes: typeof item.notes === "string" && item.notes.trim() ? item.notes : undefined,
+  };
+}
+
 function createId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -192,4 +222,53 @@ export function clearMeasurements() {
   if (!canUseStorage()) return;
   window.localStorage.removeItem(STORAGE_KEY);
   notifyMeasurementsChanged();
+}
+
+export type ImportMeasurementsResult = {
+  imported: number;
+  duplicates: number;
+  invalid: number;
+};
+
+// Backfills historical records from a JSON file. Doesn't grant ATP/farm
+// progress — those are earned by recording new measurements in the app,
+// not by importing old ones.
+export function importMeasurements(rawItems: unknown[]): ImportMeasurementsResult {
+  const existing = getMeasurements();
+  const seen = new Set(
+    existing.map((item) => `${item.date}|${item.time ?? ""}|${item.period}|${item.glucoseValue}`),
+  );
+  const now = new Date().toISOString();
+  const imported: Measurement[] = [];
+  let duplicates = 0;
+  let invalid = 0;
+
+  for (const raw of rawItems) {
+    const normalized = normalizeImportItem(raw);
+    if (!normalized) {
+      invalid += 1;
+      continue;
+    }
+
+    const key = `${normalized.date}|${normalized.time ?? ""}|${normalized.period}|${normalized.glucoseValue}`;
+    if (seen.has(key)) {
+      duplicates += 1;
+      continue;
+    }
+    seen.add(key);
+
+    imported.push({
+      ...normalized,
+      id: createId(),
+      glucose: normalized.glucoseValue,
+      rewardGranted: true,
+      createdAt: now,
+    });
+  }
+
+  if (imported.length > 0) {
+    saveMeasurements([...imported, ...existing]);
+  }
+
+  return { imported: imported.length, duplicates, invalid };
 }

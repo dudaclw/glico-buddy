@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CalendarDays, Filter, Save, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { CalendarDays, Filter, Save, Upload, X } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   CozyCard,
   GlucoseStatusBadge,
@@ -9,6 +10,7 @@ import {
   PeriodSelector,
 } from "@/components/cozy";
 import { useMeasurements } from "@/hooks/useMeasurements";
+import { importMeasurements } from "@/services/measurements";
 import type { Measurement, MeasurementInput, PeriodId } from "@/types/measurement";
 import { getMonthKey, groupMeasurementsByDate } from "@/utils/measurementCalculations";
 
@@ -19,7 +21,51 @@ export const Route = createFileRoute("/app/history")({
 function History() {
   const [month, setMonth] = useState(getMonthKey());
   const [editing, setEditing] = useState<Measurement | null>(null);
-  const { measurements, updateMeasurement, deleteMeasurement } = useMeasurements();
+  const { measurements, updateMeasurement, deleteMeasurement, refreshMeasurements } =
+    useMeasurements();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleImportFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await file.text());
+    } catch {
+      toast.error("Não foi possível ler o arquivo. Confira se é um JSON válido.");
+      return;
+    }
+
+    const rawItems = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray((parsed as { measurements?: unknown })?.measurements)
+        ? (parsed as { measurements: unknown[] }).measurements
+        : null;
+
+    if (!rawItems) {
+      toast.error('O JSON precisa ser uma lista de medições (ou {"measurements": [...]}).');
+      return;
+    }
+
+    const result = importMeasurements(rawItems);
+    refreshMeasurements();
+
+    if (result.imported === 0 && result.invalid > 0 && result.duplicates === 0) {
+      toast.error(`Nenhuma medição importada — ${result.invalid} registro(s) inválido(s).`);
+      return;
+    }
+
+    const parts = [`${result.imported} importada${result.imported === 1 ? "" : "s"}`];
+    if (result.duplicates > 0) {
+      parts.push(`${result.duplicates} duplicada${result.duplicates === 1 ? "" : "s"}`);
+    }
+    if (result.invalid > 0) {
+      parts.push(`${result.invalid} inválida${result.invalid === 1 ? "" : "s"}`);
+    }
+    toast.success(parts.join(", "));
+  }
 
   const filtered = useMemo(
     () => measurements.filter((item) => item.date.startsWith(month)),
@@ -56,6 +102,32 @@ function History() {
           onChange={(event) => setMonth(event.target.value)}
           className="mt-2 h-14 w-full rounded-2xl border-2 border-[#dcbf8b] bg-[#fffdf4] px-4 text-base font-black text-[#4a3828] outline-none focus:border-[#A67C52]"
         />
+      </CozyCard>
+
+      <CozyCard variant="sky" className="p-3">
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-black text-[#255a7c]">Importar medições antigas</p>
+            <p className="mt-1 text-xs font-bold text-[#6a7f91]">
+              Paliativo enquanto o Supabase não entra: envie um .json com registros anteriores.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            aria-label="Importar arquivo JSON de medições"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border-2 border-[#8b613b] bg-[#F7D66B] text-[#5f3f23] shadow-tile active:scale-95"
+          >
+            <Upload className="h-5 w-5" strokeWidth={3} />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+        </div>
       </CozyCard>
 
       {editing && (
