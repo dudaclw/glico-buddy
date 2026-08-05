@@ -218,29 +218,33 @@ function FarmPage() {
             )}
 
             <div className="grid gap-2">
-              {farmShopItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-2xl border-2 border-[#dcbf8b] bg-[#fffdf4] p-3 shadow-tile"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-black text-[#4a3828]">{item.name}</p>
-                      <p className="mt-1 text-xs font-bold text-[#8a6b45]">{item.description}</p>
-                      <p className="mt-2 text-xs font-black uppercase tracking-wide text-[#5e8e57]">
-                        {item.type === "seed" ? "Semente" : item.type} · {item.price} ATP
-                      </p>
+              {farmShopItems.map((item) => {
+                const affordable = rewards.atp >= item.price;
+                return (
+                  <div
+                    key={item.id}
+                    className="rounded-2xl border-2 border-[#dcbf8b] bg-[#fffdf4] p-3 shadow-tile"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-[#4a3828]">{item.name}</p>
+                        <p className="mt-1 text-xs font-bold text-[#8a6b45]">{item.description}</p>
+                        <p className="mt-2 text-xs font-black uppercase tracking-wide text-[#5e8e57]">
+                          {item.type === "seed" ? "Semente" : item.type} · {item.price} ATP
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => buyShopItem(item.id)}
+                        disabled={!affordable}
+                        className="shrink-0 rounded-2xl border-2 border-[#8b613b] bg-[#7CC576] px-3 py-2 text-xs font-black text-white shadow-tile active:scale-95 disabled:cursor-not-allowed disabled:border-[#c8b593] disabled:bg-[#e5ddc9] disabled:text-[#8a806b] disabled:active:scale-100"
+                      >
+                        Comprar
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => buyShopItem(item.id)}
-                      className="shrink-0 rounded-2xl border-2 border-[#8b613b] bg-[#7CC576] px-3 py-2 text-xs font-black text-white shadow-tile active:scale-95"
-                    >
-                      Comprar
-                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
