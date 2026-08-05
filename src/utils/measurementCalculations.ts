@@ -1,4 +1,5 @@
-import { TARGET_MAX, TARGET_MIN, type Measurement, periods } from "@/types/measurement";
+import type { Measurement } from "@/types/measurement";
+import { periods } from "@/types/measurement";
 
 export type MeasurementSummary = {
   averageAll: number | null;
@@ -78,17 +79,60 @@ export function getPeriodGroups(measurements: Measurement[]) {
   });
 }
 
+export type ChartRangeOption = "7d" | "30d" | "90d" | "all";
+
+export const CHART_RANGE_OPTIONS: Array<{ value: ChartRangeOption; label: string }> = [
+  { value: "7d", label: "7 dias" },
+  { value: "30d", label: "30 dias" },
+  { value: "90d", label: "90 dias" },
+  { value: "all", label: "Tudo" },
+];
+
+// Above this many points a raw line gets too dense to read on a small screen,
+// so the chart switches to one averaged point per day instead.
+const CHART_AGGREGATION_THRESHOLD = 40;
+
+export function filterMeasurementsByRange(measurements: Measurement[], range: ChartRangeOption) {
+  if (range === "all") return measurements;
+
+  const days = range === "7d" ? 7 : range === "30d" ? 30 : 90;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - (days - 1));
+  const cutoffKey = formatDateKey(cutoff);
+
+  return measurements.filter((item) => item.date >= cutoffKey);
+}
+
+function formatChartDay(dateKey: string) {
+  return new Date(`${dateKey}T12:00:00`).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
+
 export function getChartData(measurements: Measurement[]) {
-  return measurements
-    .slice()
-    .reverse()
-    .map((item) => ({
-      day: new Date(`${item.date}T12:00:00`).toLocaleDateString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-      }),
-      glicemia: item.glucoseValue,
-      targetMin: TARGET_MIN,
-      targetMax: TARGET_MAX,
-    }));
+  const chronological = measurements.slice().reverse();
+
+  if (chronological.length <= CHART_AGGREGATION_THRESHOLD) {
+    return {
+      data: chronological.map((item) => ({
+        day: formatChartDay(item.date),
+        glicemia: item.glucoseValue,
+      })),
+      aggregated: false,
+    };
+  }
+
+  const byDay = new Map<string, number[]>();
+  chronological.forEach((item) => {
+    byDay.set(item.date, [...(byDay.get(item.date) ?? []), item.glucoseValue]);
+  });
+
+  return {
+    data: Array.from(byDay.entries()).map(([date, values]) => ({
+      day: formatChartDay(date),
+      glicemia: Math.round(values.reduce((total, value) => total + value, 0) / values.length),
+    })),
+    aggregated: true,
+  };
 }

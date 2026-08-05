@@ -27,6 +27,9 @@ import { CozyCard, StatCard } from "@/components/cozy";
 import { useMeasurements } from "@/hooks/useMeasurements";
 import { TARGET_MAX, TARGET_MIN, type Measurement } from "@/types/measurement";
 import {
+  CHART_RANGE_OPTIONS,
+  type ChartRangeOption,
+  filterMeasurementsByRange,
   getChartData,
   getMonthKey,
   getMeasurementSummary,
@@ -40,7 +43,13 @@ export const Route = createFileRoute("/app/reports")({
 function Reports() {
   const { measurements } = useMeasurements();
   const summary = getMeasurementSummary(measurements);
-  const chartData = getChartData(measurements);
+  const [chartRange, setChartRange] = useState<ChartRangeOption>("7d");
+  const chartMeasurements = useMemo(
+    () => filterMeasurementsByRange(measurements, chartRange),
+    [measurements, chartRange],
+  );
+  const chart = useMemo(() => getChartData(chartMeasurements), [chartMeasurements]);
+  const chartTickInterval = Math.max(0, Math.ceil(chart.data.length / 6) - 1);
   const periodGroups = getPeriodGroups(measurements).filter((item) => item.count > 0);
 
   return (
@@ -96,26 +105,50 @@ function Reports() {
           </span>
           <div>
             <h2 className="text-base font-black text-[#4a3828]">Evolução glicêmica</h2>
-            <p className="text-xs font-bold text-[#6a7f91]">Linha simples dos últimos registros</p>
+            <p className="text-xs font-bold text-[#6a7f91]">
+              {chart.aggregated ? "Média diária do período" : "Registros do período"}
+            </p>
           </div>
         </div>
+
+        <div className="mb-3 flex flex-wrap gap-2">
+          {CHART_RANGE_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setChartRange(option.value)}
+              className={`rounded-2xl border-2 px-3 py-1.5 text-xs font-black transition ${
+                chartRange === option.value
+                  ? "border-[#8b613b] bg-[#F7D66B] text-[#5f3f23] shadow-tile"
+                  : "border-[#9ccded] bg-[#fffdf4] text-[#6a7f91]"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
         <div className="h-64 rounded-3xl border-2 border-[#9ccded] bg-[#fffdf4] p-2">
-          {chartData.length === 0 ? (
+          {chart.data.length === 0 ? (
             <div className="grid h-full place-items-center px-4 text-center">
               <div>
                 <p className="text-base font-black text-[#4a3828]">
                   Os gráficos aparecerão após seus primeiros registros.
                 </p>
                 <p className="mt-1 text-sm font-bold text-[#8a6b45]">
-                  Nenhuma medição registrada ainda.
+                  Nenhuma medição {chartRange === "all" ? "registrada" : "neste período"} ainda.
                 </p>
               </div>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 12, right: 10, left: -18, bottom: 0 }}>
+              <LineChart data={chart.data} margin={{ top: 12, right: 10, left: -18, bottom: 0 }}>
                 <CartesianGrid stroke="#ead7ad" strokeDasharray="4 4" />
-                <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#7c6242", fontWeight: 800 }} />
+                <XAxis
+                  dataKey="day"
+                  interval={chartTickInterval}
+                  tick={{ fontSize: 10, fill: "#7c6242", fontWeight: 800 }}
+                />
                 <YAxis
                   domain={[40, 230]}
                   tick={{ fontSize: 10, fill: "#7c6242", fontWeight: 800 }}
@@ -135,7 +168,11 @@ function Reports() {
                   dataKey="glicemia"
                   stroke="#7CC576"
                   strokeWidth={4}
-                  dot={{ r: 5, fill: "#F7D66B", stroke: "#A67C52", strokeWidth: 2 }}
+                  dot={
+                    chart.data.length > 20
+                      ? false
+                      : { r: 5, fill: "#F7D66B", stroke: "#A67C52", strokeWidth: 2 }
+                  }
                   activeDot={{ r: 7, fill: "#FFC48C", stroke: "#A67C52", strokeWidth: 2 }}
                 />
               </LineChart>
@@ -194,18 +231,18 @@ function ExportDataCard({ measurements }: { measurements: Measurement[] }) {
       return;
     }
 
-    const selectedMeasurements = getMeasurementsInCreatedAtPeriod(
-      measurements,
-      startDate,
-      endDate,
-    );
+    const selectedMeasurements = getMeasurementsInCreatedAtPeriod(measurements, startDate, endDate);
 
     if (selectedMeasurements.length === 0) {
       setMessage("Nenhuma medição encontrada nesse período.");
       return;
     }
 
-    downloadJsonReport(buildExportReport(selectedMeasurements, startDate, endDate), startDate, endDate);
+    downloadJsonReport(
+      buildExportReport(selectedMeasurements, startDate, endDate),
+      startDate,
+      endDate,
+    );
     setMessage(`${selectedMeasurements.length} medições exportadas em JSON.`);
   }
 
@@ -312,9 +349,7 @@ function getMeasurementsInCreatedAtPeriod(
     .filter((measurement) => {
       const createdAtTime = new Date(measurement.createdAt).getTime();
       return (
-        Number.isFinite(createdAtTime) &&
-        createdAtTime >= startTime &&
-        createdAtTime <= endTime
+        Number.isFinite(createdAtTime) && createdAtTime >= startTime && createdAtTime <= endTime
       );
     })
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
