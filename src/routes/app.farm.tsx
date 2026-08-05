@@ -130,7 +130,7 @@ function FarmPage() {
           )}
 
           <CozyCard className="grid gap-3">
-            <div className="sticky top-0 z-10 -mx-[1.125rem] -mt-[1.125rem] grid gap-1 rounded-t-[1.35rem] bg-[#FFF7E6] px-[1.125rem] pb-3 pt-[1.125rem] shadow-[0_-10px_16px_-6px_rgba(74,56,40,0.35)]">
+            <div className="grid gap-1">
               <button
                 type="button"
                 onClick={() => setPlotsOpen((current) => !current)}
