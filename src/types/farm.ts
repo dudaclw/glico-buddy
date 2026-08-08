@@ -29,6 +29,7 @@ export type FarmPlantingResult = {
   success: boolean;
   message: string;
   farm: Farm;
+  rewardAmount?: number;
 };
 
 export type FarmAdvanceResult = {

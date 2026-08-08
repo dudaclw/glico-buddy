@@ -15,6 +15,10 @@ import {
   saveFarmInventory,
   type FarmInventoryItem,
 } from "@/services/farmShop";
+import { recordHarvest } from "@/services/farmCollection";
+import { getMeasurements } from "@/services/measurements";
+import { addCareDrops } from "@/services/rewards";
+import { TARGET_MAX, TARGET_MIN } from "@/types/measurement";
 
 export const FARM_STORAGE_KEY = "glicotrack_farm";
 export const FARM_CHANGED_EVENT = "glicotrack_farm_changed";
@@ -274,6 +278,32 @@ export function plantSeedOnPlot(seedItemId: string, plotId: string): FarmPlantin
   };
 }
 
+const HARVEST_BASE_REWARD = 10;
+const HARVEST_CONTROL_BONUS = 20;
+
+// Rewards steady glucose control during the plant's growth window, not just
+// the act of harvesting: 10 ATP base, up to +20 for readings that stayed
+// fully within the target range while the plant was growing.
+function calculateHarvestReward(plant: FarmPlant): number {
+  const start = new Date(plant.plantedAt).getTime();
+  const end = plant.completedAt ? new Date(plant.completedAt).getTime() : Date.now();
+
+  const duringGrowth = getMeasurements().filter((measurement) => {
+    const recordedAt = new Date(measurement.createdAt).getTime();
+    return Number.isFinite(recordedAt) && recordedAt >= start && recordedAt <= end;
+  });
+
+  if (duringGrowth.length === 0) return HARVEST_BASE_REWARD;
+
+  const inRangeCount = duringGrowth.filter(
+    (measurement) =>
+      measurement.glucoseValue >= TARGET_MIN && measurement.glucoseValue <= TARGET_MAX,
+  ).length;
+  const inRangeRatio = inRangeCount / duringGrowth.length;
+
+  return HARVEST_BASE_REWARD + Math.round(inRangeRatio * HARVEST_CONTROL_BONUS);
+}
+
 export function harvestPlot(plotId: string): FarmPlantingResult {
   const farm = getFarm();
   const plot = farm.plots.find((currentPlot) => currentPlot.id === plotId);
@@ -299,12 +329,17 @@ export function harvestPlot(plotId: string): FarmPlantingResult {
 
   saveFarm(nextFarm);
 
+  const rewardAmount = plant ? calculateHarvestReward(plant) : 0;
+  if (rewardAmount > 0) addCareDrops(rewardAmount);
+  if (plant) recordHarvest(plant.seedItemId);
+
   return {
     success: true,
     message: plant
-      ? `${plant.name} colhida! O canteiro está livre para plantar de novo.`
+      ? `${plant.name} colhida! +${rewardAmount} ATP. O canteiro está livre para plantar de novo.`
       : "Canteiro colhido!",
     farm: nextFarm,
+    rewardAmount,
   };
 }
 

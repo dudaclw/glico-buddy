@@ -1,16 +1,25 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronDown, ChevronRight, PackageCheck, ShoppingBasket, X } from "lucide-react";
+import { Award, ChevronDown, ChevronRight, PackageCheck, ShoppingBasket, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import gatoImage from "../../gato.png";
 import { CozyCard } from "@/components/cozy";
 import { FarmScene } from "@/components/farm";
 import { useFarm } from "@/hooks/useFarm";
+import { useFarmCollection } from "@/hooks/useFarmCollection";
 import { useFarmShop } from "@/hooks/useFarmShop";
 import { useProfile } from "@/hooks/useProfile";
 import { useRewards } from "@/hooks/useRewards";
 import { harvestPlot, plantSeedOnPlot } from "@/services/farm";
 import { farmShopItems, getFarmShopItem, type FarmInventoryItem } from "@/services/farmShop";
-import { FARM_STAGE_LABELS, getFarmPlantIcon, type Farm, type FarmPlot } from "@/types/farm";
+import {
+  FARM_STAGE_LABELS,
+  getFarmPlantIcon,
+  SEED_COMPLETED_ICONS,
+  type Farm,
+  type FarmPlot,
+} from "@/types/farm";
+
+const farmSeeds = farmShopItems.filter((item) => item.type === "seed");
 
 export const Route = createFileRoute("/app/farm")({
   component: FarmPage,
@@ -18,6 +27,7 @@ export const Route = createFileRoute("/app/farm")({
 
 function FarmPage() {
   const { farm, refreshFarm } = useFarm();
+  const { collection } = useFarmCollection();
   const { inventory, buyItem, refreshInventory } = useFarmShop();
   const { profile } = useProfile();
   const { rewards } = useRewards();
@@ -171,6 +181,49 @@ function FarmPage() {
                 ))}
               </div>
             )}
+          </CozyCard>
+
+          <CozyCard variant="grass" className="grid gap-3">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#F7D66B] text-[#7b5a35]">
+                <Award className="h-5 w-5" />
+              </span>
+              <div>
+                <h2 className="text-base font-black text-[#375629]">Coleção</h2>
+                <p className="text-xs font-bold text-[#547d37]">
+                  {farmSeeds.filter((item) => (collection[item.id] ?? 0) > 0).length}/
+                  {farmSeeds.length} colhidas pelo menos uma vez
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {farmSeeds.map((item) => {
+                const count = collection[item.id] ?? 0;
+                const unlocked = count > 0;
+                return (
+                  <div
+                    key={item.id}
+                    className={`grid gap-1 rounded-2xl border-2 p-3 text-center shadow-tile ${
+                      unlocked ? "border-[#8b613b] bg-[#fffdf4]" : "border-[#c8d9b8] bg-[#eef3e4]"
+                    }`}
+                  >
+                    <span className="text-2xl">
+                      {unlocked ? SEED_COMPLETED_ICONS[item.id] : "❔"}
+                    </span>
+                    <span
+                      className={`text-xs font-black ${unlocked ? "text-[#4a3828]" : "text-[#9aa88c]"}`}
+                    >
+                      {item.name.replace(/^Semente de\s+/i, "")}
+                    </span>
+                    <span className="text-[10px] font-bold text-[#8a6b45]">
+                      {unlocked
+                        ? `${count}x colhida${count === 1 ? "" : "s"}`
+                        : "Ainda não colhida"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </CozyCard>
         </div>
       </div>
