@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Bell, Brush, ChevronRight, Moon, Palette, ShieldCheck, UserRound } from "lucide-react";
+import { Bell, ChevronRight, Moon, Palette, ShieldCheck, UserRound } from "lucide-react";
 import { useState } from "react";
 import { CozyCard, PixelMascot } from "@/components/cozy";
 import { useProfile } from "@/hooks/useProfile";
@@ -15,7 +15,6 @@ function Profile() {
   const [diabetesType, setDiabetesType] = useState("Tipo 1");
   const [targetMin, setTargetMin] = useState("70");
   const [targetMax, setTargetMax] = useState("180");
-  const [cozyMode, setCozyMode] = useState(true);
   const [reminders, setReminders] = useState(true);
   const { profile, setProfile } = useProfile();
   const { theme, setTheme } = useTheme();
@@ -103,13 +102,6 @@ function Profile() {
           <Palette className="h-5 w-5" />
           Configurações visuais
         </h2>
-        <SettingRow
-          icon={<Brush className="h-5 w-5" />}
-          label="Modo cozy"
-          helper="Cards maiores e cores suaves"
-          active={cozyMode}
-          onClick={() => setCozyMode((value) => !value)}
-        />
         <SettingRow
           icon={<Bell className="h-5 w-5" />}
           label="Lembretes visuais"
