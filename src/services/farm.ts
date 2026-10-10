@@ -1,6 +1,8 @@
 import {
+  FARM_MAX_PLOT_COUNT,
   FARM_PLOT_COUNT,
   getFarmPlantStage,
+  getNextPlotPrice,
   type Farm,
   type FarmAdvanceResult,
   type FarmPlant,
@@ -17,7 +19,7 @@ import {
 } from "@/services/farmShop";
 import { recordHarvest } from "@/services/farmCollection";
 import { getMeasurements } from "@/services/measurements";
-import { addCareDrops } from "@/services/rewards";
+import { addCareDrops, spendAtp } from "@/services/rewards";
 import { TARGET_MAX, TARGET_MIN } from "@/types/measurement";
 
 export const FARM_STORAGE_KEY = "glicotrack_farm";
@@ -40,11 +42,13 @@ function notifyFarmChanged() {
   }
 }
 
-function createInitialPlots(): FarmPlot[] {
-  return Array.from({ length: FARM_PLOT_COUNT }, (_, index) => ({
+function createInitialPlots(plotCount = FARM_PLOT_COUNT): FarmPlot[] {
+  const total = Math.min(Math.max(Math.round(plotCount), FARM_PLOT_COUNT), FARM_MAX_PLOT_COUNT);
+
+  return Array.from({ length: total }, (_, index) => ({
     id: `plot_${index + 1}`,
     plantId: null,
-    status: "empty",
+    status: "empty" as FarmPlotStatus,
   }));
 }
 
@@ -122,7 +126,9 @@ function normalizeFarm(value: unknown): Farm | null {
   const normalizedPlots = Array.isArray(item.plots)
     ? item.plots.map(normalizePlot).filter((plot): plot is FarmPlot => Boolean(plot))
     : [];
-  const plots = createInitialPlots().map((defaultPlot) => {
+  // A quantidade de canteiros desbloqueados vem do próprio estado salvo
+  // (limitada entre o mínimo inicial e o máximo comprável).
+  const plots: FarmPlot[] = createInitialPlots(normalizedPlots.length).map((defaultPlot) => {
     const storedPlot = normalizedPlots.find((plot) => plot.id === defaultPlot.id);
     if (!storedPlot) return defaultPlot;
 
@@ -274,6 +280,42 @@ export function plantSeedOnPlot(seedItemId: string, plotId: string): FarmPlantin
   return {
     success: true,
     message: `${newPlant.name} plantada com sucesso!`,
+    farm: nextFarm,
+  };
+}
+
+export function expandFarm(): FarmPlantingResult {
+  const farm = getFarm();
+  const price = getNextPlotPrice(farm.plots.length);
+
+  if (price === null || farm.plots.length >= FARM_MAX_PLOT_COUNT) {
+    return {
+      success: false,
+      message: "Sua fazenda já está no tamanho máximo.",
+      farm,
+    };
+  }
+
+  const spendResult = spendAtp(price);
+
+  if (!spendResult.success) {
+    return {
+      success: false,
+      message: `ATP insuficiente: o próximo canteiro custa ${price} ATP.`,
+      farm,
+    };
+  }
+
+  const nextFarm: Farm = {
+    ...farm,
+    plots: [...farm.plots, { id: `plot_${farm.plots.length + 1}`, plantId: null, status: "empty" }],
+  };
+
+  saveFarm(nextFarm);
+
+  return {
+    success: true,
+    message: `Canteiro ${nextFarm.plots.length} desbloqueado por ${price} ATP!`,
     farm: nextFarm,
   };
 }

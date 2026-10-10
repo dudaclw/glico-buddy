@@ -12,6 +12,7 @@ import { FarmDashboardCard } from "@/components/farm";
 import { useFarm } from "@/hooks/useFarm";
 import { useMeasurements } from "@/hooks/useMeasurements";
 import { useRewards } from "@/hooks/useRewards";
+import { useStreak } from "@/hooks/useStreak";
 import { periods } from "@/types/measurement";
 import { getMeasurementSummary, getTodayKey } from "@/utils/measurementCalculations";
 
@@ -31,7 +32,17 @@ function Dashboard() {
   const { measurements } = useMeasurements();
   const { farm } = useFarm();
   const { rewards } = useRewards();
+  const { streak, claimRewards } = useStreak(measurements);
   const [greeting, setGreeting] = useState("Olá");
+  const [streakMessage, setStreakMessage] = useState("");
+
+  function collectStreakRewards() {
+    const result = claimRewards();
+    if (result.total > 0) {
+      setStreakMessage(`+${result.total} ATP de constância. Continue assim!`);
+    }
+  }
+
   const summary = getMeasurementSummary(measurements);
   const questGoal = 4;
   const remainingToday = Math.max(0, questGoal - summary.todayCount);
@@ -116,6 +127,45 @@ function Dashboard() {
       </div>
 
       <ProgressQuestBar current={summary.todayCount} total={questGoal} />
+
+      <CozyCard variant="wood" className="grid gap-3 p-4">
+        <div className="flex items-center gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#F7D66B] text-2xl leading-none">
+            {streak.current > 0 ? "🔥" : "🌙"}
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-black text-white">
+              {streak.current > 0
+                ? `${streak.current} dia${streak.current === 1 ? "" : "s"} seguidos`
+                : "Sequência zerada"}
+            </h2>
+            <p className="text-xs font-bold text-[#f0ddb8]">
+              {streak.nextMilestone
+                ? `Faltam ${streak.nextMilestone.days - streak.current} dia${
+                    streak.nextMilestone.days - streak.current === 1 ? "" : "s"
+                  } para +${streak.nextMilestone.reward} ATP`
+                : "Todos os marcos conquistados!"}
+              {streak.best > 0 ? ` · recorde: ${streak.best}` : ""}
+            </p>
+          </div>
+        </div>
+
+        {streakMessage && (
+          <p className="rounded-2xl bg-[#F7D66B] px-3 py-2 text-sm font-black text-[#5f3f23]">
+            {streakMessage}
+          </p>
+        )}
+
+        {streak.pending.length > 0 && (
+          <button
+            type="button"
+            onClick={collectStreakRewards}
+            className="min-h-12 rounded-2xl border-2 border-[#8b613b] bg-[#7CC576] px-4 text-sm font-black text-white shadow-tile active:scale-[0.98]"
+          >
+            Resgatar +{streak.pending.reduce((total, item) => total + item.reward, 0)} ATP
+          </button>
+        )}
+      </CozyCard>
 
       <FarmDashboardCard farm={farm} />
 

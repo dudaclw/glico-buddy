@@ -35,8 +35,9 @@ export function FarmScene({
 
   return (
     <div
+      style={{ gridTemplateColumns: `repeat(${Math.max(plots.length, 1)}, minmax(0, 1fr))` }}
       className={cn(
-        "mx-auto grid w-full grid-cols-[repeat(5,minmax(0,1fr))] items-center overflow-visible",
+        "mx-auto grid w-full items-center overflow-visible",
         compact
           ? "min-h-[clamp(3.25rem,16vw,5rem)] max-w-[18rem] gap-[clamp(0.0625rem,0.8vw,0.25rem)]"
           : "min-h-[clamp(3.75rem,18vw,6rem)] max-w-[24rem] gap-[clamp(0.0625rem,1vw,0.375rem)]",

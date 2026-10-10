@@ -27,7 +27,17 @@ export type FarmShopPurchaseResult = {
   atp: number;
 };
 
+// Ordenadas da mais rápida/barata para a mais longa/cara: o preço é o que
+// controla o ritmo da coleção, sem precisar de desbloqueio separado.
 export const farmShopItems: FarmShopItem[] = [
+  {
+    id: "seed_lettuce",
+    name: "Semente de Alface",
+    type: "seed",
+    price: 20,
+    description: "Cresce rapidinho, boa para dias corridos.",
+    growthRequiredRecords: 2,
+  },
   {
     id: "seed_carrot",
     name: "Semente de Cenoura",
@@ -35,6 +45,14 @@ export const farmShopItems: FarmShopItem[] = [
     price: 30,
     description: "Uma semente simples para começar sua horta.",
     growthRequiredRecords: 3,
+  },
+  {
+    id: "seed_tomato",
+    name: "Semente de Tomate",
+    type: "seed",
+    price: 45,
+    description: "Gosta de sol e de rotina constante.",
+    growthRequiredRecords: 4,
   },
   {
     id: "seed_strawberry",
@@ -45,12 +63,80 @@ export const farmShopItems: FarmShopItem[] = [
     growthRequiredRecords: 5,
   },
   {
+    id: "seed_corn",
+    name: "Semente de Milho",
+    type: "seed",
+    price: 75,
+    description: "Alto e firme, recompensa quem não falha.",
+    growthRequiredRecords: 6,
+  },
+  {
     id: "seed_sunflower",
     name: "Semente de Girassol",
     type: "seed",
     price: 90,
     description: "Uma flor especial para deixar a fazenda mais bonita.",
     growthRequiredRecords: 7,
+  },
+  {
+    id: "seed_pumpkin",
+    name: "Semente de Abóbora",
+    type: "seed",
+    price: 110,
+    description: "Pesada e paciente: leva tempo, mas impressiona.",
+    growthRequiredRecords: 8,
+  },
+  {
+    id: "seed_tulip",
+    name: "Semente de Tulipa",
+    type: "seed",
+    price: 125,
+    description: "Delicada e rara, só floresce com muita constância.",
+    growthRequiredRecords: 9,
+  },
+  {
+    id: "seed_watermelon",
+    name: "Semente de Melancia",
+    type: "seed",
+    price: 150,
+    description: "A joia da horta: a colheita mais longa da fazenda.",
+    growthRequiredRecords: 10,
+  },
+  // Decorações são compradas uma única vez e ficam fixas no cenário.
+  {
+    id: "deco_fence",
+    name: "Cerca de madeira",
+    type: "decoration",
+    price: 80,
+    description: "Dá um contorno caprichado para a fazendinha.",
+  },
+  {
+    id: "deco_flowers",
+    name: "Canteiro de flores",
+    type: "decoration",
+    price: 120,
+    description: "Um cantinho florido só para enfeitar.",
+  },
+  {
+    id: "deco_basket",
+    name: "Cesta de colheita",
+    type: "decoration",
+    price: 160,
+    description: "Sinal de que esta fazenda já rendeu bastante.",
+  },
+  {
+    id: "deco_fountain",
+    name: "Fonte",
+    type: "decoration",
+    price: 220,
+    description: "O som da água deixa a rotina mais leve.",
+  },
+  {
+    id: "deco_chicken",
+    name: "Galinha",
+    type: "decoration",
+    price: 300,
+    description: "A moradora mais tagarela do terreno.",
   },
 ];
 
@@ -121,6 +207,19 @@ export function buyFarmShopItem(itemId: string): FarmShopPurchaseResult {
 
   const currentRewards = getUserRewards();
   const currentInventory = getFarmInventory();
+
+  // Decoração é única: comprar de novo só gastaria ATP à toa.
+  if (
+    item.type === "decoration" &&
+    currentInventory.some((inventoryItem) => inventoryItem.itemId === item.id)
+  ) {
+    return {
+      success: false,
+      message: `Você já tem ${item.name} na fazenda.`,
+      inventory: currentInventory,
+      atp: currentRewards.atp,
+    };
+  }
 
   if (currentRewards.atp < item.price) {
     return {

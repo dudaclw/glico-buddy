@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Award, ChevronDown, ChevronRight, PackageCheck, ShoppingBasket, X } from "lucide-react";
+import { Award, ChevronRight, PackageCheck, ShoppingBasket, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import gatoImage from "../../gato.png";
 import { CozyCard } from "@/components/cozy";
@@ -9,17 +9,20 @@ import { useFarmCollection } from "@/hooks/useFarmCollection";
 import { useFarmShop } from "@/hooks/useFarmShop";
 import { useProfile } from "@/hooks/useProfile";
 import { useRewards } from "@/hooks/useRewards";
-import { harvestPlot, plantSeedOnPlot } from "@/services/farm";
+import { expandFarm, harvestPlot, plantSeedOnPlot } from "@/services/farm";
 import { farmShopItems, getFarmShopItem, type FarmInventoryItem } from "@/services/farmShop";
 import {
+  DECORATION_ICONS,
   FARM_STAGE_LABELS,
   getFarmPlantIcon,
+  getNextPlotPrice,
   SEED_COMPLETED_ICONS,
   type Farm,
   type FarmPlot,
 } from "@/types/farm";
 
 const farmSeeds = farmShopItems.filter((item) => item.type === "seed");
+const farmDecorations = farmShopItems.filter((item) => item.type === "decoration");
 
 export const Route = createFileRoute("/app/farm")({
   component: FarmPage,
@@ -37,8 +40,13 @@ function FarmPage() {
   const [shopMessageType, setShopMessageType] = useState<"success" | "error">("success");
   const [farmMessage, setFarmMessage] = useState("");
   const [farmMessageType, setFarmMessageType] = useState<"success" | "error">("success");
-  const [plotsOpen, setPlotsOpen] = useState(true);
+  const [plotsOpen, setPlotsOpen] = useState(false);
+  const [collectionOpen, setCollectionOpen] = useState(false);
   const seedInventory = inventory.filter((item) => item.type === "seed");
+  const nextPlotPrice = getNextPlotPrice(farm.plots.length);
+  const ownedDecorations = farmDecorations.filter((item) =>
+    inventory.some((inventoryItem) => inventoryItem.itemId === item.id),
+  );
 
   useEffect(() => {
     if (!shopMessage) return;
@@ -76,6 +84,13 @@ function FarmPage() {
     refreshFarm();
   }
 
+  function expandFarmPlots() {
+    const result = expandFarm();
+    setFarmMessage(result.message);
+    setFarmMessageType(result.success ? "success" : "error");
+    refreshFarm();
+  }
+
   return (
     <>
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 bg-farm-background" />
@@ -87,6 +102,20 @@ function FarmPage() {
           draggable={false}
         />
       </div>
+      {ownedDecorations.length > 0 && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-x-0 top-[calc(clamp(20rem,48vh,24rem)-2.5rem)] z-20 px-4"
+        >
+          <div className="mx-auto flex max-w-[24rem] items-end justify-center gap-3">
+            {ownedDecorations.map((item) => (
+              <span key={item.id} className="text-xl leading-none drop-shadow-sm">
+                {DECORATION_ICONS[item.id]}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="pointer-events-none fixed inset-x-0 top-[clamp(20rem,48vh,24rem)] z-20 px-4">
         <div className="mx-auto max-w-md">
           <FarmScene farm={farm} highlightCurrent showNumbers />
@@ -126,105 +155,41 @@ function FarmPage() {
           maskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)",
         }}
       >
-        <div className="mx-auto max-w-md space-y-4">
-          {farmMessage && (
-            <p
-              className={`rounded-2xl border-2 px-3 py-2 text-sm font-black shadow-tile ${
-                farmMessageType === "success"
-                  ? "border-[#82cf67] bg-[#dff3c8] text-[#375629]"
-                  : "border-[#dcbf8b] bg-[#ffe4d2] text-[#8f3f28]"
-              }`}
-            >
-              {farmMessage}
-            </p>
-          )}
+        <div className="mx-auto grid max-w-md gap-3">
+          <button
+            type="button"
+            onClick={() => setPlotsOpen(true)}
+            className="flex w-full items-center justify-between gap-3 rounded-[1.35rem] border-2 border-[#8b613b] bg-[#FFF7E6] px-4 py-3 text-left shadow-cozy active:scale-[0.99]"
+          >
+            <span className="grid gap-0.5">
+              <span className="text-base font-black text-[#4a3828]">Canteiros</span>
+              <span className="text-xs font-bold text-[#8a6b45]">
+                {farm.plots.length} canteiro{farm.plots.length === 1 ? "" : "s"} ·{" "}
+                {farm.plants.length} planta{farm.plants.length === 1 ? "" : "s"}
+              </span>
+            </span>
+            <ChevronRight className="h-6 w-6 shrink-0 text-[#5f3f23]" strokeWidth={3} />
+          </button>
 
-          <CozyCard className="grid gap-3">
-            <div className="grid gap-1">
-              <button
-                type="button"
-                onClick={() => setPlotsOpen((current) => !current)}
-                aria-expanded={plotsOpen}
-                className="flex w-full items-center justify-between gap-3 text-left active:scale-[0.99]"
-              >
-                <span className="text-base font-black text-[#4a3828]">Canteiros</span>
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border-2 border-[#8b613b] bg-[#fff7e6] text-[#5f3f23] shadow-tile">
-                  <ChevronDown
-                    className={`h-5 w-5 transition-transform ${plotsOpen ? "rotate-180" : ""}`}
-                    strokeWidth={3}
-                  />
-                </span>
-              </button>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-bold text-[#8a6b45]">
-                  {farm.plants.length} planta{farm.plants.length === 1 ? "" : "s"} na fazendinha
-                </span>
-                <span className="shrink-0 rounded-2xl bg-[#F7D66B] px-3 py-1 text-xs font-black text-[#5f3f23] shadow-tile">
-                  {seedInventory.reduce((total, item) => total + item.quantity, 0)} sementes no
-                  estoque
-                </span>
-              </div>
-            </div>
-
-            {plotsOpen && (
-              <div className="grid gap-2">
-                {farm.plots.map((plot, index) => (
-                  <FarmPlotRow
-                    key={plot.id}
-                    plot={plot}
-                    plotNumber={index + 1}
-                    farm={farm}
-                    seedInventory={seedInventory}
-                    onPlant={plantSeed}
-                    onHarvest={harvestPlotAndFree}
-                  />
-                ))}
-              </div>
-            )}
-          </CozyCard>
-
-          <CozyCard variant="grass" className="grid gap-3">
-            <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setCollectionOpen(true)}
+            className="flex w-full items-center justify-between gap-3 rounded-[1.35rem] border-2 border-[#8b613b] bg-[#dff3c8] px-4 py-3 text-left shadow-cozy active:scale-[0.99]"
+          >
+            <span className="flex items-center gap-3">
               <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#F7D66B] text-[#7b5a35]">
                 <Award className="h-5 w-5" />
               </span>
-              <div>
-                <h2 className="text-base font-black text-[#375629]">Coleção</h2>
-                <p className="text-xs font-bold text-[#547d37]">
+              <span className="grid gap-0.5">
+                <span className="text-base font-black text-[#375629]">Coleção</span>
+                <span className="text-xs font-bold text-[#547d37]">
                   {farmSeeds.filter((item) => (collection[item.id] ?? 0) > 0).length}/
                   {farmSeeds.length} colhidas pelo menos uma vez
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {farmSeeds.map((item) => {
-                const count = collection[item.id] ?? 0;
-                const unlocked = count > 0;
-                return (
-                  <div
-                    key={item.id}
-                    className={`grid gap-1 rounded-2xl border-2 p-3 text-center shadow-tile ${
-                      unlocked ? "border-[#8b613b] bg-[#fffdf4]" : "border-[#c8d9b8] bg-[#eef3e4]"
-                    }`}
-                  >
-                    <span className="text-2xl">
-                      {unlocked ? SEED_COMPLETED_ICONS[item.id] : "❔"}
-                    </span>
-                    <span
-                      className={`text-xs font-black ${unlocked ? "text-[#4a3828]" : "text-[#9aa88c]"}`}
-                    >
-                      {item.name.replace(/^Semente de\s+/i, "")}
-                    </span>
-                    <span className="text-[10px] font-bold text-[#8a6b45]">
-                      {unlocked
-                        ? `${count}x colhida${count === 1 ? "" : "s"}`
-                        : "Ainda não colhida"}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </CozyCard>
+                </span>
+              </span>
+            </span>
+            <ChevronRight className="h-6 w-6 shrink-0 text-[#375629]" strokeWidth={3} />
+          </button>
         </div>
       </div>
 
@@ -270,31 +235,166 @@ function FarmPage() {
               </p>
             )}
 
+            {(
+              [
+                { label: "Sementes", items: farmSeeds },
+                { label: "Decorações", items: farmDecorations },
+              ] as const
+            ).map((section) => (
+              <div key={section.label} className="mb-4 grid gap-2 last:mb-0">
+                <p className="text-xs font-black uppercase tracking-wide text-[#8a6b45]">
+                  {section.label}
+                </p>
+                {section.items.map((item) => {
+                  const owned =
+                    item.type === "decoration" &&
+                    inventory.some((inventoryItem) => inventoryItem.itemId === item.id);
+                  const affordable = rewards.atp >= item.price;
+                  return (
+                    <div
+                      key={item.id}
+                      className="rounded-2xl border-2 border-[#dcbf8b] bg-[#fffdf4] p-3 shadow-tile"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-black text-[#4a3828]">
+                            {item.type === "decoration" ? `${DECORATION_ICONS[item.id]} ` : ""}
+                            {item.name}
+                          </p>
+                          <p className="mt-1 text-xs font-bold text-[#8a6b45]">
+                            {item.description}
+                          </p>
+                          <p className="mt-2 text-xs font-black uppercase tracking-wide text-[#5e8e57]">
+                            {item.type === "seed" ? "Semente" : "Decoração"} · {item.price} ATP
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => buyShopItem(item.id)}
+                          disabled={owned || !affordable}
+                          className="shrink-0 rounded-2xl border-2 border-[#8b613b] bg-[#7CC576] px-3 py-2 text-xs font-black text-white shadow-tile active:scale-95 disabled:cursor-not-allowed disabled:border-[#c8b593] disabled:bg-[#e5ddc9] disabled:text-[#8a806b] disabled:active:scale-100"
+                        >
+                          {owned ? "Comprado" : "Comprar"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {plotsOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#4a3828]/30 px-3 pb-3 pt-10 backdrop-blur-sm">
+          <div className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-[1.5rem] border-2 border-[#8b613b] bg-[#FFF7E6] p-4 shadow-cozy">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-black text-[#4a3828]">Canteiros</h2>
+                <p className="mt-1 text-sm font-bold text-[#7c6242]">
+                  {farm.plants.length} planta{farm.plants.length === 1 ? "" : "s"} na fazendinha ·{" "}
+                  {seedInventory.reduce((total, item) => total + item.quantity, 0)} sementes no
+                  estoque
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPlotsOpen(false)}
+                aria-label="Fechar canteiros"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border-2 border-[#8b613b] bg-[#F7D66B] text-[#5f3f23] shadow-tile active:scale-95"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {farmMessage && (
+              <p
+                className={`mb-3 rounded-2xl border-2 px-3 py-2 text-sm font-black shadow-tile ${
+                  farmMessageType === "success"
+                    ? "border-[#82cf67] bg-[#dff3c8] text-[#375629]"
+                    : "border-[#dcbf8b] bg-[#ffe4d2] text-[#8f3f28]"
+                }`}
+              >
+                {farmMessage}
+              </p>
+            )}
+
             <div className="grid gap-2">
-              {farmShopItems.map((item) => {
-                const affordable = rewards.atp >= item.price;
+              {farm.plots.map((plot, index) => (
+                <FarmPlotRow
+                  key={plot.id}
+                  plot={plot}
+                  plotNumber={index + 1}
+                  farm={farm}
+                  seedInventory={seedInventory}
+                  onPlant={plantSeed}
+                  onHarvest={harvestPlotAndFree}
+                />
+              ))}
+
+              {nextPlotPrice !== null ? (
+                <button
+                  type="button"
+                  onClick={expandFarmPlots}
+                  disabled={rewards.atp < nextPlotPrice}
+                  className="rounded-2xl border-2 border-dashed border-[#b99a6e] bg-[#fffdf4] px-3 py-3 text-sm font-black text-[#7c6242] shadow-tile active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
+                >
+                  + Desbloquear canteiro {farm.plots.length + 1} · {nextPlotPrice} ATP
+                </button>
+              ) : (
+                <p className="rounded-2xl border-2 border-dashed border-[#b99a6e] bg-[#fffdf4] px-3 py-3 text-center text-xs font-bold text-[#8a6b45]">
+                  Fazenda no tamanho máximo ({farm.plots.length} canteiros).
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {collectionOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#4a3828]/30 px-3 pb-3 pt-10 backdrop-blur-sm">
+          <div className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-[1.5rem] border-2 border-[#8b613b] bg-[#FFF7E6] p-4 shadow-cozy">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-black text-[#4a3828]">Coleção</h2>
+                <p className="mt-1 text-sm font-bold text-[#7c6242]">
+                  {farmSeeds.filter((item) => (collection[item.id] ?? 0) > 0).length}/
+                  {farmSeeds.length} colhidas pelo menos uma vez
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCollectionOpen(false)}
+                aria-label="Fechar coleção"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border-2 border-[#8b613b] bg-[#F7D66B] text-[#5f3f23] shadow-tile active:scale-95"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {farmSeeds.map((item) => {
+                const count = collection[item.id] ?? 0;
+                const unlocked = count > 0;
                 return (
                   <div
                     key={item.id}
-                    className="rounded-2xl border-2 border-[#dcbf8b] bg-[#fffdf4] p-3 shadow-tile"
+                    className={`grid gap-1 rounded-2xl border-2 p-3 text-center shadow-tile ${
+                      unlocked ? "border-[#8b613b] bg-[#fffdf4]" : "border-[#c8d9b8] bg-[#eef3e4]"
+                    }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-black text-[#4a3828]">{item.name}</p>
-                        <p className="mt-1 text-xs font-bold text-[#8a6b45]">{item.description}</p>
-                        <p className="mt-2 text-xs font-black uppercase tracking-wide text-[#5e8e57]">
-                          {item.type === "seed" ? "Semente" : item.type} · {item.price} ATP
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => buyShopItem(item.id)}
-                        disabled={!affordable}
-                        className="shrink-0 rounded-2xl border-2 border-[#8b613b] bg-[#7CC576] px-3 py-2 text-xs font-black text-white shadow-tile active:scale-95 disabled:cursor-not-allowed disabled:border-[#c8b593] disabled:bg-[#e5ddc9] disabled:text-[#8a806b] disabled:active:scale-100"
-                      >
-                        Comprar
-                      </button>
-                    </div>
+                    <span className="text-2xl">
+                      {unlocked ? SEED_COMPLETED_ICONS[item.id] : "❔"}
+                    </span>
+                    <span
+                      className={`text-xs font-black ${unlocked ? "text-[#4a3828]" : "text-[#9aa88c]"}`}
+                    >
+                      {item.name.replace(/^Semente de\s+/i, "")}
+                    </span>
+                    <span className="text-[10px] font-bold text-[#8a6b45]">
+                      {unlocked
+                        ? `${count}x colhida${count === 1 ? "" : "s"}`
+                        : "Ainda não colhida"}
+                    </span>
                   </div>
                 );
               })}
@@ -428,16 +528,20 @@ function FarmPlotRow({
             </span>
           ) : (
             seedInventory.map((item) => {
-              const shopItem = getFarmShopItem(item.itemId);
+              const plantName = getFarmShopItem(item.itemId)?.name.replace(/^Semente de\s+/i, "");
               return (
                 <button
                   key={item.itemId}
                   type="button"
                   onClick={() => onPlant(item.itemId, plot.id)}
-                  className="rounded-2xl border-2 border-[#8b613b] bg-[#7CC576] px-3 py-2 text-xs font-black text-white shadow-tile active:scale-95"
+                  title={`Plantar ${plantName ?? "semente"}`}
+                  aria-label={`Plantar ${plantName ?? "semente"} (${item.quantity} no estoque)`}
+                  className="flex items-center gap-1 rounded-2xl border-2 border-[#8b613b] bg-[#7CC576] px-2.5 py-1.5 text-xs font-black text-white shadow-tile active:scale-95"
                 >
-                  Plantar {shopItem?.name.replace(/^Semente de\s+/i, "") ?? "semente"} x
-                  {item.quantity}
+                  <span className="text-base leading-none">
+                    {SEED_COMPLETED_ICONS[item.itemId] ?? "🌱"}
+                  </span>
+                  <span>x{item.quantity}</span>
                 </button>
               );
             })
