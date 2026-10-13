@@ -1,5 +1,5 @@
 import type { Measurement, MeasurementInput, PeriodId } from "@/types/measurement";
-import { addCareDrops, calculateGlucoseRecordReward } from "@/services/rewards";
+import { claimGlucoseRecordReward } from "@/services/rewards";
 
 export const STORAGE_KEY = "glicotrack_measurements";
 export const MEASUREMENTS_CHANGED_EVENT = "glicotrack_measurements_changed";
@@ -178,16 +178,13 @@ export function createMeasurement(input: MeasurementInput): MeasurementCreateRes
     createdAt: now,
   };
   const existingMeasurements = getMeasurements();
-  const nextMeasurements = [measurement, ...existingMeasurements];
-  const recordsOfTheDay = nextMeasurements.filter((item) => item.date === measurement.date);
-  const rewardAmount = calculateGlucoseRecordReward(measurement, recordsOfTheDay);
+  const rewardAmount = claimGlucoseRecordReward(measurement, existingMeasurements);
   const rewardedMeasurement = {
     ...measurement,
-    rewardGranted: true,
+    rewardGranted: rewardAmount > 0,
   };
 
   saveMeasurements([rewardedMeasurement, ...existingMeasurements]);
-  addCareDrops(rewardAmount);
 
   return {
     measurement: rewardedMeasurement,

@@ -56,8 +56,10 @@ function NewMeasurement() {
       insulinUnits,
       notes,
     });
-    const farmResult = progressFarmPlantsAfterGlucoseRecord();
-    setFarmFeedback(farmResult.progressedPlants.length > 0 ? farmResult : null);
+    // Só registros que rendem ATP fazem a fazenda crescer, senão apagar e
+    // registrar de novo viraria atalho para colher.
+    const farmResult = result.rewardAmount > 0 ? progressFarmPlantsAfterGlucoseRecord() : null;
+    setFarmFeedback(farmResult && farmResult.progressedPlants.length > 0 ? farmResult : null);
     setSavedReward(result.rewardAmount);
     setSaved(true);
     setAttemptedSave(false);
@@ -86,7 +88,11 @@ function NewMeasurement() {
           <CheckCircle2 className="h-6 w-6" />
           <div>
             <p className="text-sm font-black">Registro salvo no diário</p>
-            <p className="text-xs font-bold">Você ganhou +{savedReward} ATP.</p>
+            <p className="text-xs font-bold">
+              {savedReward > 0
+                ? `Você ganhou +${savedReward} ATP.`
+                : "Este período já rendeu ATP hoje (ou o limite diário foi atingido)."}
+            </p>
           </div>
         </div>
       )}

@@ -18,9 +18,7 @@ import {
   type FarmInventoryItem,
 } from "@/services/farmShop";
 import { recordHarvest } from "@/services/farmCollection";
-import { getMeasurements } from "@/services/measurements";
 import { addCareDrops, spendAtp } from "@/services/rewards";
-import { TARGET_MAX, TARGET_MIN } from "@/types/measurement";
 
 export const FARM_STORAGE_KEY = "glicotrack_farm";
 export const FARM_CHANGED_EVENT = "glicotrack_farm_changed";
@@ -320,30 +318,10 @@ export function expandFarm(): FarmPlantingResult {
   };
 }
 
-const HARVEST_BASE_REWARD = 10;
-const HARVEST_CONTROL_BONUS = 20;
-
-// Rewards steady glucose control during the plant's growth window, not just
-// the act of harvesting: 10 ATP base, up to +20 for readings that stayed
-// fully within the target range while the plant was growing.
+// Colheita recompensa o hábito (sementes maiores pedem mais registros), nunca o
+// valor da glicemia: premiar "valores bons" incentiva omitir medições altas.
 function calculateHarvestReward(plant: FarmPlant): number {
-  const start = new Date(plant.plantedAt).getTime();
-  const end = plant.completedAt ? new Date(plant.completedAt).getTime() : Date.now();
-
-  const duringGrowth = getMeasurements().filter((measurement) => {
-    const recordedAt = new Date(measurement.createdAt).getTime();
-    return Number.isFinite(recordedAt) && recordedAt >= start && recordedAt <= end;
-  });
-
-  if (duringGrowth.length === 0) return HARVEST_BASE_REWARD;
-
-  const inRangeCount = duringGrowth.filter(
-    (measurement) =>
-      measurement.glucoseValue >= TARGET_MIN && measurement.glucoseValue <= TARGET_MAX,
-  ).length;
-  const inRangeRatio = inRangeCount / duringGrowth.length;
-
-  return HARVEST_BASE_REWARD + Math.round(inRangeRatio * HARVEST_CONTROL_BONUS);
+  return 10 + plant.growthRequiredRecords * 2;
 }
 
 export function harvestPlot(plotId: string): FarmPlantingResult {

@@ -98,16 +98,55 @@ export function spendAtp(amount: number) {
   };
 }
 
-export function calculateGlucoseRecordReward(record: Measurement, recordsOfTheDay: Measurement[]) {
+export const REWARDED_SLOTS_STORAGE_KEY = "glicotrack_rewarded_slots";
+export const MAX_REWARDED_RECORDS_PER_DAY = 4;
+
+function getRecordSlot(record: Pick<Measurement, "date" | "period">) {
+  return `${record.date}|${record.period}`;
+}
+
+function getRewardedSlots(): string[] {
+  if (!canUseStorage()) return [];
+
+  try {
+    const parsed: unknown = JSON.parse(
+      window.localStorage.getItem(REWARDED_SLOTS_STORAGE_KEY) ?? "[]",
+    );
+    return Array.isArray(parsed) ? parsed.filter((slot) => typeof slot === "string") : [];
+  } catch {
+    window.localStorage.removeItem(REWARDED_SLOTS_STORAGE_KEY);
+    return [];
+  }
+}
+
+// Cada período do dia rende ATP uma única vez, até o limite diário. O registro
+// fica guardado à parte, então apagar e registrar de novo não paga outra vez.
+// Registros que já existiam contam como pagos (cobre quem tinha dados antes).
+export function claimGlucoseRecordReward(record: Measurement, existingRecords: Measurement[]) {
+  const rewardedSlots = getRewardedSlots();
+  const claimed = new Set([...rewardedSlots, ...existingRecords.map(getRecordSlot)]);
+  const slot = getRecordSlot(record);
+  const claimedToday = [...claimed].filter((item) => item.startsWith(`${record.date}|`)).length;
+
+  if (claimed.has(slot) || claimedToday >= MAX_REWARDED_RECORDS_PER_DAY) return 0;
+
   let reward = 10;
 
   if (record.insulinUnits && record.insulinUnits > 0) {
     reward += 5;
   }
 
-  if (recordsOfTheDay.length === 3) {
+  if (claimedToday + 1 === 3) {
     reward += 15;
   }
+
+  if (canUseStorage()) {
+    window.localStorage.setItem(
+      REWARDED_SLOTS_STORAGE_KEY,
+      JSON.stringify([...rewardedSlots, slot]),
+    );
+  }
+  addCareDrops(reward);
 
   return reward;
 }
