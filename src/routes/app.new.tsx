@@ -25,6 +25,7 @@ function NewMeasurement() {
   const [notes, setNotes] = useState("");
   const [saved, setSaved] = useState(false);
   const [savedReward, setSavedReward] = useState(0);
+  const [savedCounted, setSavedCounted] = useState(false);
   const [attemptedSave, setAttemptedSave] = useState(false);
   const [farmFeedback, setFarmFeedback] = useState<FarmAdvanceResult | null>(null);
   const { createMeasurement } = useMeasurements();
@@ -56,11 +57,12 @@ function NewMeasurement() {
       insulinUnits,
       notes,
     });
-    // Só registros que rendem ATP fazem a fazenda crescer, senão apagar e
-    // registrar de novo viraria atalho para colher.
-    const farmResult = result.rewardAmount > 0 ? progressFarmPlantsAfterGlucoseRecord() : null;
+    // Só o primeiro registro de cada período faz a fazenda crescer, senão apagar
+    // e registrar de novo viraria atalho para colher.
+    const farmResult = result.counted ? progressFarmPlantsAfterGlucoseRecord() : null;
     setFarmFeedback(farmResult && farmResult.progressedPlants.length > 0 ? farmResult : null);
     setSavedReward(result.rewardAmount);
+    setSavedCounted(result.counted);
     setSaved(true);
     setAttemptedSave(false);
     setGlucose("");
@@ -91,7 +93,9 @@ function NewMeasurement() {
             <p className="text-xs font-bold">
               {savedReward > 0
                 ? `Você ganhou +${savedReward} ATP.`
-                : "Este período já rendeu ATP hoje (ou o limite diário foi atingido)."}
+                : savedCounted
+                  ? "Fora do alvo não rende ATP, mas o registro conta para a fazenda."
+                  : "Este período já foi registrado hoje (ou o limite diário foi atingido)."}
             </p>
           </div>
         </div>

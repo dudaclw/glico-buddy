@@ -7,6 +7,7 @@ export const MEASUREMENTS_CHANGED_EVENT = "glicotrack_measurements_changed";
 export type MeasurementCreateResult = {
   measurement: Measurement;
   rewardAmount: number;
+  counted: boolean;
 };
 
 const periodIds: PeriodId[] = [
@@ -178,7 +179,7 @@ export function createMeasurement(input: MeasurementInput): MeasurementCreateRes
     createdAt: now,
   };
   const existingMeasurements = getMeasurements();
-  const rewardAmount = claimGlucoseRecordReward(measurement, existingMeasurements);
+  const { rewardAmount, counted } = claimGlucoseRecordReward(measurement, existingMeasurements);
   const rewardedMeasurement = {
     ...measurement,
     rewardGranted: rewardAmount > 0,
@@ -189,6 +190,7 @@ export function createMeasurement(input: MeasurementInput): MeasurementCreateRes
   return {
     measurement: rewardedMeasurement,
     rewardAmount,
+    counted,
   };
 }
 

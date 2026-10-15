@@ -1,4 +1,4 @@
-import type { Measurement } from "@/types/measurement";
+import { TARGET_MAX, TARGET_MIN, type Measurement } from "@/types/measurement";
 
 export const REWARDS_STORAGE_KEY = "glicotrack_user_rewards";
 export const REWARDS_CHANGED_EVENT = "glicotrack_rewards_changed";
@@ -122,13 +122,28 @@ function getRewardedSlots(): string[] {
 // Cada período do dia rende ATP uma única vez, até o limite diário. O registro
 // fica guardado à parte, então apagar e registrar de novo não paga outra vez.
 // Registros que já existiam contam como pagos (cobre quem tinha dados antes).
+// Só leituras dentro do alvo rendem ATP, mas a fora do alvo ainda ocupa o
+// período: apagar e trocar por um valor "bom" não paga.
 export function claimGlucoseRecordReward(record: Measurement, existingRecords: Measurement[]) {
   const rewardedSlots = getRewardedSlots();
   const claimed = new Set([...rewardedSlots, ...existingRecords.map(getRecordSlot)]);
   const slot = getRecordSlot(record);
   const claimedToday = [...claimed].filter((item) => item.startsWith(`${record.date}|`)).length;
 
-  if (claimed.has(slot) || claimedToday >= MAX_REWARDED_RECORDS_PER_DAY) return 0;
+  if (claimed.has(slot) || claimedToday >= MAX_REWARDED_RECORDS_PER_DAY) {
+    return { rewardAmount: 0, counted: false };
+  }
+
+  if (canUseStorage()) {
+    window.localStorage.setItem(
+      REWARDED_SLOTS_STORAGE_KEY,
+      JSON.stringify([...rewardedSlots, slot]),
+    );
+  }
+
+  if (record.glucoseValue < TARGET_MIN || record.glucoseValue > TARGET_MAX) {
+    return { rewardAmount: 0, counted: true };
+  }
 
   let reward = 10;
 
@@ -140,13 +155,7 @@ export function claimGlucoseRecordReward(record: Measurement, existingRecords: M
     reward += 15;
   }
 
-  if (canUseStorage()) {
-    window.localStorage.setItem(
-      REWARDED_SLOTS_STORAGE_KEY,
-      JSON.stringify([...rewardedSlots, slot]),
-    );
-  }
   addCareDrops(reward);
 
-  return reward;
+  return { rewardAmount: reward, counted: true };
 }
