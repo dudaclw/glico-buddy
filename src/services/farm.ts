@@ -382,7 +382,7 @@ export function progressFarmPlantsAfterGlucoseRecord(): FarmAdvanceResult {
 
     progressedPlants.push(nextPlant);
 
-    if (nextStage === "completed" && plant.stage !== "completed") {
+    if (nextStage === "completed") {
       completedPlants.push(nextPlant);
     }
 
